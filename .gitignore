@@ -1,1 +1,18 @@
+# Environment
+.env
+.env.local
+.env.production
 
+# Dependencies
+node_modules/
+
+# Vercel
+.vercel
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
