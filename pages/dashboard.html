@@ -321,14 +321,8 @@
 
   <script>
     // Check admin auth
-    if (!localStorage.getItem('kidsstore_adminLoggedIn') || localStorage.getItem('kidsstore_adminLoggedIn') !== 'true') {
-      window.location.href = 'login.html';
-    }
-
-    function adminLogout() {
-      localStorage.removeItem('kidsstore_adminLoggedIn');
-      window.location.href = 'login.html';
-    }
+    <script src="/js/auth.js"></script>
+<script src="/js/dashboard.js"></script>
 
     // Update sync status
     function updateSyncStatus(status, message) {
