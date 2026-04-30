@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Login - KidoCart</title>
-  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -15,50 +15,35 @@
         <h1 style="margin-top: 1rem;">Admin Panel</h1>
         <p class="subtitle">KidoCart Administration</p>
       </div>
-      
+
       <form id="admin-login-form">
+        <div id="login-error" style="display:none; background:var(--danger-light); color:#991b1b; padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.875rem;">
+        </div>
+
         <div class="form-group">
           <label class="form-label">Username</label>
           <input type="text" class="form-input" id="username" placeholder="Enter admin username" required>
         </div>
-        
+
         <div class="form-group">
           <label class="form-label">Password</label>
           <input type="password" class="form-input" id="password" placeholder="Enter admin password" required>
         </div>
-        
+
         <button type="submit" class="btn btn-primary w-full btn-lg">
           <i class="fas fa-sign-in-alt"></i> Login to Admin Panel
         </button>
       </form>
-      
-      
+
       <p style="text-align: center; margin-top: 1.5rem;">
-        <a href="https://www.kidocart.shop/" style="color: var(--primary);"><i class="fas fa-arrow-left"></i> Back to Store</a>
+        <a href="https://www.kidocart.shop/" style="color: var(--primary);">
+          <i class="fas fa-arrow-left"></i> Back to Store
+        </a>
       </p>
     </div>
   </div>
 
-  <script src="../js/data.js"></script>
-  <script>
-    // Redirect if already logged in
-    if (isAdminLoggedIn()) {
-      window.location.href = 'dashboard.html';
-    }
-
-    document.getElementById('admin-login-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      
-      if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        setAdminLoggedIn(true);
-        window.location.href = 'dashboard.html';
-      } else {
-        alert('Invalid credentials!');
-      }
-    });
-  </script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/login.js"></script>
 </body>
 </html>
