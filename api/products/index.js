@@ -1,22 +1,15 @@
 // Vercel Serverless Function - Products API
 const mongoose = require('mongoose');
 
-// MongoDB connection
-let cachedDb = null;
-
-async function connectToDatabase() {
-  if (cachedDb) {
-    return cachedDb;
-  }
-  
-  const client = await mongoose.connect(process.env.MONGODB_URI, {
+// ─── Bulletproof Serverless MongoDB Connection ───
+const connectDB = async () => {
+  // Checks the actual live connection state, not a stale cache variable
+  if (mongoose.connection.readyState >= 1) return;
+  await mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   });
-  
-  cachedDb = client;
-  return cachedDb;
-}
+};
 
 // Product Schema with multiple images
 const productSchema = new mongoose.Schema({
@@ -32,18 +25,18 @@ const productSchema = new mongoose.Schema({
   availability: { type: Boolean, default: true },
   rating: { type: Number, default: 4.5 },
   reviewCount: { type: Number, default: 0 },
-    reviews: [{
+  reviews: [{
     userName: String,
     rating: Number,
     comment: String,
-    date: {type: Date, default: Date.now }
+    date: { type: Date, default: Date.now }
   }],
   dimentions: {
     length: Number,
     width: Number,
     height: Number,
     weight: Number,
-    unit: {type: String, default: 'cm'}
+    unit: { type: String, default: 'cm' }
   },
   sizes: [String],
   colors: [String],
@@ -51,7 +44,7 @@ const productSchema = new mongoose.Schema({
   featured: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-});
+}, { strict: false }); // Added to prevent crashes if frontend sends unexpected fields
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 
@@ -66,7 +59,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await connectToDatabase();
+    await connectDB(); // Safely connect using the new logic
 
     const { id } = req.query;
 
