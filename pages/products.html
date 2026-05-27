@@ -7,158 +7,42 @@
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    .toast-container {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 9999;
-    }
-    .toast {
-      padding: 15px 25px;
-      border-radius: 10px;
-      margin-bottom: 10px;
-      color: white;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      animation: slideIn 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    .toast.success { background: #10b981; }
-    .toast.error { background: #ef4444; }
-    .toast.warning { background: #f59e0b; }
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    .product-thumb { 
-      width: 60px; 
-      height: 60px; 
-      border-radius: 10px; 
-      object-fit: cover; 
-    }
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+    .toast { padding: 15px 25px; border-radius: 10px; margin-bottom: 10px; color: white; font-weight: 500; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.warning { background: #f59e0b; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .product-thumb { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; }
     .action-btns { display: flex; gap: 8px; }
-    .action-btns button { 
-      padding: 8px 12px; 
-      border: none; 
-      border-radius: 8px; 
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .btn-edit { background: #dbeafe; color: #2563eb; }
-    .btn-edit:hover { background: #2563eb; color: white; }
-    .btn-delete { background: #fee2e2; color: #dc2626; }
-    .btn-delete:hover { background: #dc2626; color: white; }
-    .search-filter { 
-      display: flex; 
-      gap: 15px; 
-      margin-bottom: 20px; 
-      flex-wrap: wrap; 
-    }
-    .search-filter input, 
-    .search-filter select { 
-      padding: 10px 15px; 
-      border: 2px solid #e5e7eb; 
-      border-radius: 10px;
-      font-size: 14px;
-    }
+    .action-btns button { padding: 8px 12px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+    .btn-edit { background: #dbeafe; color: #2563eb; } .btn-edit:hover { background: #2563eb; color: white; }
+    .btn-delete { background: #fee2e2; color: #dc2626; } .btn-delete:hover { background: #dc2626; color: white; }
+    .search-filter { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .search-filter input, .search-filter select { padding: 10px 15px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; }
     .search-filter input { flex: 1; min-width: 250px; }
-    .search-filter input:focus,
-    .search-filter select:focus {
-      outline: none;
-      border-color: #6366f1;
-    }
-    .toggle-switch { 
-      position: relative; 
-      width: 50px; 
-      height: 26px;
-      display: inline-block;
-    }
+    .search-filter input:focus, .search-filter select:focus { outline: none; border-color: #6366f1; }
+    .toggle-switch { position: relative; width: 50px; height: 26px; display: inline-block; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider { 
-      position: absolute; 
-      cursor: pointer; 
-      top: 0; left: 0; right: 0; bottom: 0; 
-      background-color: #ccc; 
-      border-radius: 26px; 
-      transition: 0.3s; 
-    }
-    .toggle-slider:before { 
-      position: absolute; 
-      content: ""; 
-      height: 20px; 
-      width: 20px; 
-      left: 3px; 
-      bottom: 3px; 
-      background-color: white; 
-      border-radius: 50%; 
-      transition: 0.3s; 
-    }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 26px; transition: 0.3s; }
+    .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; }
     .toggle-switch input:checked + .toggle-slider { background-color: #10b981; }
     .toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
-    .modal-form .form-row { 
-      display: grid; 
-      grid-template-columns: 1fr 1fr; 
-      gap: 15px; 
-    }
-    @media (max-width: 768px) {
-      .modal-form .form-row { grid-template-columns: 1fr; }
-    }
-    .stock-low { color: #f59e0b; font-weight: 600; }
-    .stock-out { color: #ef4444; font-weight: 600; }
-    .stock-good { color: #10b981; }
-    .badge-preview {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-    .badge-new { background: #d1fae5; color: #059669; }
-    .badge-sale { background: #fee2e2; color: #dc2626; }
-    .badge-hot { background: #fef3c7; color: #d97706; }
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #6366f1;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .sync-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      background: #f0fdf4;
-      color: #16a34a;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .sync-status.syncing {
-      background: #fef3c7;
-      color: #d97706;
-    }
-    .sync-status.error {
-      background: #fee2e2;
-      color: #dc2626;
-    }
+    .modal-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    @media (max-width: 768px) { .modal-form .form-row { grid-template-columns: 1fr; } }
+    .stock-low { color: #f59e0b; font-weight: 600; } .stock-out { color: #ef4444; font-weight: 600; } .stock-good { color: #10b981; }
+    .badge-preview { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-new { background: #d1fae5; color: #059669; } .badge-sale { background: #fee2e2; color: #dc2626; } .badge-hot { background: #fef3c7; color: #d97706; }
+    .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #6366f1; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .sync-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; background: #f0fdf4; color: #16a34a; border-radius: 8px; font-size: 14px; font-weight: 500; }
+    .sync-status.syncing { background: #fef3c7; color: #d97706; } .sync-status.error { background: #fee2e2; color: #dc2626; }
+    /* Image Preview Grid */
+    #image-preview-container img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
   </style>
 </head>
 <body>
-  <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
   <div class="admin-layout">
-    <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="logo">
         <i class="fas fa-baby"></i> Kido<span>Cart</span>
@@ -178,7 +62,6 @@
       </div>
     </aside>
 
-    <!-- Main Content -->
     <main class="admin-main">
       <div class="admin-header">
         <div>
@@ -190,27 +73,13 @@
         </button>
       </div>
 
-      <!-- Stats -->
       <div class="stats-grid">
-        <div class="stat-card">
-          <h3>Total Products</h3>
-          <p class="value" id="stat-total">0</p>
-        </div>
-        <div class="stat-card">
-          <h3>In Stock</h3>
-          <p class="value" id="stat-instock" style="color: #10b981;">0</p>
-        </div>
-        <div class="stat-card">
-          <h3>Low Stock</h3>
-          <p class="value" id="stat-lowstock" style="color: #f59e0b;">0</p>
-        </div>
-        <div class="stat-card">
-          <h3>Out of Stock</h3>
-          <p class="value" id="stat-outofstock" style="color: #ef4444;">0</p>
-        </div>
+        <div class="stat-card"><h3>Total Products</h3><p class="value" id="stat-total">0</p></div>
+        <div class="stat-card"><h3>In Stock</h3><p class="value" id="stat-instock" style="color: #10b981;">0</p></div>
+        <div class="stat-card"><h3>Low Stock</h3><p class="value" id="stat-lowstock" style="color: #f59e0b;">0</p></div>
+        <div class="stat-card"><h3>Out of Stock</h3><p class="value" id="stat-outofstock" style="color: #ef4444;">0</p></div>
       </div>
 
-      <!-- Search & Filter -->
       <div class="search-filter">
         <input type="text" id="search" placeholder="🔍 Search products by name, brand..." oninput="filterProducts()">
         <select id="filter-category" onchange="filterProducts()">
@@ -238,45 +107,29 @@
         </button>
       </div>
 
-      <!-- Products Table -->
       <div class="admin-card">
         <div style="overflow-x: auto;">
           <table class="data-table" id="products-table">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Age Group</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Available</th>
-                <th>Actions</th>
+                <th>Product</th><th>Category</th><th>Age Group</th><th>Price</th><th>Stock</th><th>Available</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="products-tbody">
-              <tr>
-                <td colspan="7" style="text-align: center;">
-                  <div class="loading-spinner"></div> Loading products from database...
-                </td>
-              </tr>
+              <tr><td colspan="7" style="text-align: center;"><div class="loading-spinner"></div> Loading products...</td></tr>
             </tbody>
           </table>
         </div>
         
-        <!-- Empty State -->
         <div id="empty-state" style="display: none; text-align: center; padding: 60px 20px;">
           <i class="fas fa-box-open" style="font-size: 4rem; color: #e5e7eb; margin-bottom: 20px;"></i>
           <h3 style="color: var(--gray);">No products found</h3>
-          <p style="color: var(--gray);">Add your first product to get started!</p>
-          <button class="btn btn-primary" onclick="openAddModal()" style="margin-top: 15px;">
-            <i class="fas fa-plus"></i> Add Product
-          </button>
+          <button class="btn btn-primary" onclick="openAddModal()" style="margin-top: 15px;"><i class="fas fa-plus"></i> Add Product</button>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- Add/Edit Product Modal -->
   <div class="modal-overlay" id="product-modal">
     <div class="modal" style="max-width: 750px;">
       <div class="modal-header">
@@ -382,26 +235,11 @@
           </div>
         </div>
         
-        <div class="form-group">
-          <label class="form-label">Image URLs * <small style="color: var(--gray);">(Add multiple images)</small></label>
-          <div id="image-inputs">
-            <div class="image-input-group" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-              <input type="url" class="form-input" name="product-images" placeholder="https://example.com/image1.jpg" required>
-              <button type="button" class="btn btn-sm btn-outline" onclick="removeImageInput(this)" style="display: none;">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline" onclick="addImageInput()" style="margin-top: 0.5rem;">
-            <i class="fas fa-plus"></i> Add Another Image
-          </button>
-          <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--pastel-yellow); border-radius: 8px; border-left: 4px solid var(--warning);">
-            <small style="color: var(--dark); display: block;">
-              <strong>💡 ImgBB Users:</strong> Use the "Direct Link" option (URL must end in .jpg or .png).<br>
-              ❌ Wrong: <code>https://ibb.co/0VYFR7hq</code><br>
-              ✅ Correct: <code>https://i.ibb.co/abcd/image.jpg</code>
-            </small>
-          </div>
+        <div class="form-group" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1;">
+          <label class="form-label">Upload Product Images <small>(Select multiple files)</small></label>
+          <input type="file" class="form-input" id="product-images-upload" accept="image/*" multiple>
+          <div id="image-preview-container" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;"></div>
+          <small style="color: var(--gray); display: block; margin-top: 5px;">Images will automatically be uploaded to ImgBB when you save.</small>
         </div>
         
         <div class="form-row">
@@ -423,9 +261,7 @@
         </div>
         
         <div style="display: flex; gap: 15px; margin-top: 25px;">
-          <button type="button" class="btn btn-outline" onclick="closeModal()" style="flex: 1;">
-            Cancel
-          </button>
+          <button type="button" class="btn btn-outline" onclick="closeModal()" style="flex: 1;">Cancel</button>
           <button type="submit" class="btn btn-primary" style="flex: 2;">
             <i class="fas fa-save"></i> <span id="submit-btn-text">Save Product</span>
           </button>
@@ -434,12 +270,11 @@
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal -->
   <div class="modal-overlay" id="delete-modal">
     <div class="modal" style="max-width: 400px; text-align: center;">
       <i class="fas fa-exclamation-triangle" style="font-size: 4rem; color: #ef4444; margin-bottom: 20px;"></i>
       <h2>Delete Product?</h2>
-      <p style="color: var(--gray); margin: 15px 0;">This action cannot be undone. The product will be permanently removed from the database.</p>
+      <p style="color: var(--gray); margin: 15px 0;">This cannot be undone.</p>
       <div style="display: flex; gap: 15px; margin-top: 25px;">
         <button class="btn btn-outline" onclick="closeDeleteModal()" style="flex: 1;">Cancel</button>
         <button class="btn btn-danger" onclick="confirmDelete()" style="flex: 1;">
@@ -449,498 +284,6 @@
     </div>
   </div>
 
-  <script>
-    // Check admin authentication
-    if (!localStorage.getItem('kidsstore_adminLoggedIn') || localStorage.getItem('kidsstore_adminLoggedIn') !== 'true') {
-      window.location.href = 'login.html';
-    }
-
-    let deleteProductId = null;
-    let allProducts = [];
-
-    // Toast notification function
-    function showToast(message, type = 'success') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = `toast ${type}`;
-      
-      const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-exclamation-circle';
-      toast.innerHTML = `<i class="fas ${icon}"></i> ${message}`;
-      
-      container.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.style.animation = 'slideIn 0.3s ease reverse';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
-
-    // Update sync status
-    function updateSyncStatus(status) {
-      const el = document.getElementById('sync-status');
-      if (status === 'syncing') {
-        el.className = 'sync-status syncing';
-        el.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px;"></div> Syncing...';
-      } else if (status === 'error') {
-        el.className = 'sync-status error';
-        el.innerHTML = '<i class="fas fa-exclamation-circle"></i> Sync Error';
-      } else {
-        el.className = 'sync-status';
-        el.innerHTML = '<i class="fas fa-check-circle"></i> MongoDB Connected';
-      }
-    }
-
-    // Admin logout
-    function adminLogout() {
-      localStorage.removeItem('kidsstore_adminLoggedIn');
-      window.location.href = 'login.html';
-    }
-
-    // Load products from MongoDB
-    async function loadProducts() {
-      try {
-        updateSyncStatus('syncing');
-        
-        const response = await fetch('/api/products');
-        if (response.ok) {
-          allProducts = await response.json();
-          renderProducts(allProducts);
-          updateStats();
-          updateSyncStatus('connected');
-          console.log('Loaded', allProducts.length, 'products from MongoDB');
-        } else {
-          throw new Error('Failed to fetch products');
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-        updateSyncStatus('error');
-        showToast('Failed to load products from database', 'error');
-      }
-    }
-
-    // Update statistics
-    function updateStats() {
-      const inStock = allProducts.filter(p => p.availability && p.stock > 10);
-      const lowStock = allProducts.filter(p => p.stock > 0 && p.stock <= 10);
-      const outOfStock = allProducts.filter(p => p.stock === 0 || !p.availability);
-
-      document.getElementById('stat-total').textContent = allProducts.length;
-      document.getElementById('stat-instock').textContent = inStock.length;
-      document.getElementById('stat-lowstock').textContent = lowStock.length;
-      document.getElementById('stat-outofstock').textContent = outOfStock.length;
-    }
-
-    // Render products table
-    function renderProducts(products) {
-      const tbody = document.getElementById('products-tbody');
-      const emptyState = document.getElementById('empty-state');
-      const table = document.getElementById('products-table');
-
-      if (products.length === 0) {
-        table.style.display = 'none';
-        emptyState.style.display = 'block';
-        return;
-      }
-
-      table.style.display = 'table';
-      emptyState.style.display = 'none';
-
-      tbody.innerHTML = products.map(product => {
-        let stockClass = 'stock-good';
-        let stockText = product.stock;
-        if (product.stock === 0) {
-          stockClass = 'stock-out';
-          stockText = 'Out of stock';
-        } else if (product.stock <= 10) {
-          stockClass = 'stock-low';
-          stockText = `${product.stock} left`;
-        }
-
-        const badgeHtml = product.badge 
-          ? `<span class="badge-preview badge-${product.badge}">${product.badge}</span>` 
-          : '';
-
-        const productId = product._id || product.id;
-        
-        // Robust image handling
-        let firstImage = '/placeholder.jpg';
-        if (product.images) {
-          if (Array.isArray(product.images) && product.images.length > 0) {
-            firstImage = product.images[0];
-          } else if (typeof product.images === 'string') {
-            firstImage = product.images;
-          }
-        } else if (product.image) {
-          firstImage = product.image;
-        }
-
-        return `
-          <tr>
-            <td>
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <img src="${firstImage}" class="product-thumb" alt="${product.name}" 
-                     onerror="this.src='https://via.placeholder.com/60x60?text=No+Image'">
-                <div>
-                  <strong style="display: block; margin-bottom: 3px;">${product.name.substring(0, 40)}${product.name.length > 40 ? '...' : ''}</strong>
-                  ${badgeHtml}
-                  <small style="color: var(--gray); display: block; margin-top: 3px;">${product.brand || 'No brand'}</small>
-                </div>
-              </div>
-            </td>
-            <td><span style="text-transform: capitalize;">${product.category}</span></td>
-            <td>${product.ageGroup}</td>
-            <td>
-              <strong style="color: var(--primary);">₹${parseFloat(product.price).toFixed(0)}</strong>
-              ${product.originalPrice ? `<br><small style="text-decoration: line-through; color: var(--gray);">₹${parseFloat(product.originalPrice).toFixed(0)}</small>` : ''}
-            </td>
-            <td><span class="${stockClass}">${stockText}</span></td>
-            <td>
-              <label class="toggle-switch">
-                <input type="checkbox" ${product.availability ? 'checked' : ''} onchange="toggleAvailability('${productId}', this.checked)">
-                <span class="toggle-slider"></span>
-              </label>
-            </td>
-            <td>
-              <div class="action-btns">
-                <button class="btn-edit" onclick="editProduct('${productId}')" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-delete" onclick="openDeleteModal('${productId}')" title="Delete">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    // Filter products
-    function filterProducts() {
-      const search = document.getElementById('search').value.toLowerCase();
-      const category = document.getElementById('filter-category').value;
-      const age = document.getElementById('filter-age').value;
-
-      let filtered = allProducts;
-
-      if (search) {
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(search) || 
-          (p.brand && p.brand.toLowerCase().includes(search)) ||
-          (p.description && p.description.toLowerCase().includes(search))
-        );
-      }
-
-      if (category) {
-        filtered = filtered.filter(p => p.category === category);
-      }
-
-      if (age) {
-        filtered = filtered.filter(p => p.ageGroup === age);
-      }
-
-      renderProducts(filtered);
-    }
-
-    // Toggle availability
-    async function toggleAvailability(productId, availability) {
-      try {
-        updateSyncStatus('syncing');
-        
-        const response = await fetch(`/api/products?id=${productId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ availability })
-        });
-
-        if (response.ok) {
-          showToast(`Product ${availability ? 'enabled' : 'disabled'}`, 'success');
-          await loadProducts();
-        } else {
-          throw new Error('Failed to update availability');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        showToast('Failed to update availability', 'error');
-        updateSyncStatus('error');
-      }
-    }
-
-    // Open add modal
-    function openAddModal() {
-      document.getElementById('modal-title').innerHTML = '<i class="fas fa-plus-circle"></i> Add New Product';
-      document.getElementById('product-form').reset();
-      document.getElementById('product-id').value = '';
-      document.getElementById('product-availability').checked = true;
-      document.getElementById('availability-text').textContent = 'Available';
-      document.getElementById('submit-btn-text').textContent = 'Save Product';
-      
-      // Reset image inputs
-      const container = document.getElementById('image-inputs');
-      container.innerHTML = `
-        <div class="image-input-group" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-          <input type="url" class="form-input" name="product-images" placeholder="https://example.com/image1.jpg" required>
-          <button type="button" class="btn btn-sm btn-outline" onclick="removeImageInput(this)" style="display: none;">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      `;
-      
-      document.getElementById('product-modal').classList.add('active');
-    }
-
-    // Edit product
-    async function editProduct(productId) {
-      const product = allProducts.find(p => (p._id || p.id) === productId);
-      
-      if (!product) {
-        showToast('Product not found', 'error');
-        return;
-      }
-
-      document.getElementById('modal-title').innerHTML = '<i class="fas fa-edit"></i> Edit Product';
-      document.getElementById('product-id').value = productId;
-      document.getElementById('product-name').value = product.name;
-      document.getElementById('product-description').value = product.description || '';
-      document.getElementById('product-category').value = product.category;
-      document.getElementById('product-age').value = product.ageGroup;
-      document.getElementById('product-brand').value = product.brand || '';
-      document.getElementById('product-badge').value = product.badge || '';
-      document.getElementById('product-price').value = product.price;
-      document.getElementById('product-original-price').value = product.originalPrice || '';
-      document.getElementById('product-stock').value = product.stock;
-      document.getElementById('product-availability').checked = product.availability;
-      document.getElementById('availability-text').textContent = product.availability ? 'Available' : 'Unavailable';
-      document.getElementById('product-sizes').value = product.sizes ? product.sizes.join(', ') : '';
-      document.getElementById('product-colors').value = product.colors ? product.colors.join(', ') : '';
-      document.getElementById('product-featured').checked = product.featured || false;
-      document.getElementById('submit-btn-text').textContent = 'Update Product';
-      
-      // Load multiple images
-      const container = document.getElementById('image-inputs');
-      container.innerHTML = '';
-      
-      // Handle different image structures
-      let images = [];
-      if (product.images) {
-        if (Array.isArray(product.images)) images = product.images;
-        else if (typeof product.images === 'string') images = [product.images];
-      } else if (product.image) {
-        images = [product.image];
-      }
-      
-      if (images.length > 0) {
-        images.forEach((url, index) => {
-          const div = document.createElement('div');
-          div.className = 'image-input-group';
-          div.style = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem;';
-          div.innerHTML = `
-            <input type="url" class="form-input" name="product-images" value="${url}" placeholder="https://example.com/image${index + 1}.jpg" required>
-            <button type="button" class="btn btn-sm btn-outline" onclick="removeImageInput(this)" ${index === 0 && images.length === 1 ? 'style="display: none;"' : ''}>
-              <i class="fas fa-times"></i>
-            </button>
-          `;
-          container.appendChild(div);
-        });
-      } else {
-        container.innerHTML = `
-          <div class="image-input-group" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-            <input type="url" class="form-input" name="product-images" placeholder="https://example.com/image1.jpg" required>
-            <button type="button" class="btn btn-sm btn-outline" onclick="removeImageInput(this)" style="display: none;">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-        `;
-      }
-
-      document.getElementById('product-modal').classList.add('active');
-    }
-
-    // Close modal
-    function closeModal() {
-      document.getElementById('product-modal').classList.remove('active');
-    }
-
-    // Open delete modal
-    function openDeleteModal(productId) {
-      deleteProductId = productId;
-      document.getElementById('delete-modal').classList.add('active');
-    }
-
-    // Close delete modal
-    function closeDeleteModal() {
-      deleteProductId = null;
-      document.getElementById('delete-modal').classList.remove('active');
-    }
-
-    // Confirm delete
-    async function confirmDelete() {
-      if (!deleteProductId) return;
-
-      try {
-        updateSyncStatus('syncing');
-        
-        const response = await fetch(`/api/products?id=${deleteProductId}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          closeDeleteModal();
-          showToast('Product deleted successfully', 'success');
-          await loadProducts();
-        } else {
-          throw new Error('Failed to delete product');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        showToast('Failed to delete product', 'error');
-        updateSyncStatus('error');
-      }
-    }
-
-    // Multiple Image Functions
-    function addImageInput() {
-      const container = document.getElementById('image-inputs');
-      const newInput = document.createElement('div');
-      newInput.className = 'image-input-group';
-      newInput.style = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem;';
-      newInput.innerHTML = `
-        <input type="url" class="form-input" name="product-images" placeholder="https://example.com/image${container.children.length + 1}.jpg" required>
-        <button type="button" class="btn btn-sm btn-outline" onclick="removeImageInput(this)">
-          <i class="fas fa-times"></i>
-        </button>
-      `;
-      container.appendChild(newInput);
-      
-      // Show remove button on first input if there are multiple
-      if (container.children.length > 1) {
-        container.children[0].querySelector('button').style.display = 'inline-flex';
-      }
-    }
-
-    function removeImageInput(button) {
-      const container = document.getElementById('image-inputs');
-      button.parentElement.remove();
-      
-      // Hide remove button on first input if only one left
-      if (container.children.length === 1) {
-        container.children[0].querySelector('button').style.display = 'none';
-      }
-    }
-
-    function getImageUrls() {
-      const inputs = document.querySelectorAll('input[name="product-images"]');
-      const urls = [];
-      inputs.forEach(input => {
-        if (input.value.trim()) {
-          urls.push(input.value.trim());
-        }
-      });
-      return urls;
-    }
-
-    // Availability toggle text update
-    document.getElementById('product-availability').addEventListener('change', function() {
-      document.getElementById('availability-text').textContent = this.checked ? 'Available' : 'Unavailable';
-    });
-
-    // Form submission
-    document.getElementById('product-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      const productId = document.getElementById('product-id').value;
-      const submitBtn = e.target.querySelector('button[type="submit"]');
-      const originalText = submitBtn.innerHTML;
-      
-      // Show loading state
-      submitBtn.innerHTML = '<div class="loading-spinner"></div> Saving...';
-      submitBtn.disabled = true;
-
-      try {
-        updateSyncStatus('syncing');
-
-        // Build product data
-        const productData = {
-          name: document.getElementById('product-name').value.trim(),
-          description: document.getElementById('product-description').value.trim(),
-          category: document.getElementById('product-category').value,
-          ageGroup: document.getElementById('product-age').value,
-          brand: document.getElementById('product-brand').value,
-          badge: document.getElementById('product-badge').value || null,
-          price: parseFloat(document.getElementById('product-price').value),
-          originalPrice: document.getElementById('product-original-price').value 
-            ? parseFloat(document.getElementById('product-original-price').value) 
-            : null,
-          stock: parseInt(document.getElementById('product-stock').value),
-          availability: document.getElementById('product-availability').checked,
-          images: getImageUrls(),
-          sizes: document.getElementById('product-sizes').value 
-            ? document.getElementById('product-sizes').value.split(',').map(s => s.trim()).filter(s => s) 
-            : null,
-          colors: document.getElementById('product-colors').value 
-            ? document.getElementById('product-colors').value.split(',').map(c => c.trim()).filter(c => c) 
-            : null,
-          featured: document.getElementById('product-featured').checked,
-          rating: 4.5,
-          reviewCount: 0
-        };
-
-        let response;
-        if (productId) {
-          // Update existing product
-          response = await fetch(`/api/products?id=${productId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(productData)
-          });
-        } else {
-          // Add new product
-          response = await fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(productData)
-          });
-        }
-
-        if (response.ok) {
-          const savedProduct = await response.json();
-          showToast(productId ? 'Product updated successfully!' : 'Product added successfully!', 'success');
-          closeModal();
-          await loadProducts();
-        } else {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to save product');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        showToast(error.message || 'Failed to save product', 'error');
-        updateSyncStatus('error');
-      } finally {
-        // Restore button
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-      }
-    });
-
-    // Close modals on outside click
-    document.getElementById('product-modal').addEventListener('click', function(e) {
-      if (e.target === this) closeModal();
-    });
-    
-    document.getElementById('delete-modal').addEventListener('click', function(e) {
-      if (e.target === this) closeDeleteModal();
-    });
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('Admin Products Page - MongoDB Integration Active');
-      loadProducts();
-      
-      // Auto-refresh every 30 seconds to sync with database
-      setInterval(() => {
-        loadProducts();
-      }, 30000);
-    });
-  </script>
+  <script src="../js/products.js"></script>
 </body>
 </html>
