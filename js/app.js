@@ -2,7 +2,12 @@
 // KidoCart Admin - Core Application Logic
 // ==========================================
 
-const API_BASE = ''; 
+// Route Guard: If no token is found, automatically bounce back to login screen
+if (!localStorage.getItem('admin_token') && !window.location.href.includes('login.html')) {
+    window.location.href = 'login.html';
+}
+
+const API_BASE = 'https://admin.kidocart.shop'; 
 let allProducts = [];
 let cachedImgbbKey = null;
 
