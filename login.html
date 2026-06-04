@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .login-container {
+      display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--bg-color);
+    }
+    .login-card {
+      background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border); width: 100%; max-width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+    .login-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center; color: var(--primary); }
+    .error-msg { color: var(--danger); font-size: 14px; margin-bottom: 15px; display: none; text-align: center; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-title">Kido<span>Cart</span> Admin</div>
+      <div class="error-msg" id="error-box">Invalid credentials</div>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" id="username" class="form-input" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" class="form-input" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;" id="login-btn">Log In</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://admin.kidocart.shop';
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById('error-box');
+      const loginBtn = document.getElementById('login-btn');
+      
+      errorBox.style.display = 'none';
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in...';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+
+        // Save the token to local storage securely
+        localStorage.setItem('admin_token', data.token);
+        
+        // Redirect straight to your dashboard panel
+        window.location.href = 'index.html';
+
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Log In';
+      }
+    });
+  </script>
+</body>
+</html>
