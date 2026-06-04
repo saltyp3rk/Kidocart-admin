@@ -54,13 +54,14 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// Verify JWT token
+// ─── Check the VIP Pass ───
 function verifyToken(authHeader) {
   if (!authHeader) return null;
-  const token = authHeader.replace('Bearer ', '');
   try {
+    const token = authHeader.replace('Bearer ', '');
+    // FIX: Re-added your fallback secret key so it matches your login system!
     return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
-  } catch {
+  } catch (e) {
     return null;
   }
 }
