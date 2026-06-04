@@ -1,0 +1,128 @@
+/* ─── CSS VARIABLES (THEME) ─── */
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --danger: #ef4444;
+  --success: #10b981;
+}
+
+/* ─── RESET & BASE ─── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color); color: var(--text-main);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── APP LAYOUT ─── */
+.app-container { display: flex; height: 100vh; overflow: hidden; }
+.main-content { flex: 1; padding: 20px; overflow-y: auto; padding-bottom: 80px; } 
+
+/* ─── DESKTOP SIDEBAR ─── */
+.desktop-sidebar {
+  width: 250px; background: var(--card-bg); border-right: 1px solid var(--border);
+  display: none; flex-direction: column;
+}
+.desktop-sidebar .logo { padding: 20px; font-size: 24px; font-weight: bold; color: var(--primary); }
+.desktop-sidebar .logo span { color: var(--text-main); }
+.side-nav { display: flex; flex-direction: column; padding: 10px; gap: 5px; }
+.side-nav .nav-item {
+  padding: 12px 15px; text-decoration: none; color: var(--text-muted);
+  border-radius: 8px; display: flex; align-items: center; gap: 10px; font-weight: 500;
+}
+.side-nav .nav-item.active { background: var(--primary); color: white; }
+
+/* ─── MOBILE HEADER & NAV ─── */
+.app-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 20px; background: var(--card-bg); border-bottom: 1px solid var(--border);
+}
+.app-header .logo { font-size: 20px; font-weight: bold; color: var(--primary); }
+.app-header .logo span { color: var(--text-main); }
+
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card-bg); border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around; padding: 10px 0;
+  padding-bottom: env(safe-area-inset-bottom, 10px); z-index: 1000;
+}
+.bottom-nav .nav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  text-decoration: none; color: var(--text-muted); font-size: 12px; font-weight: 500;
+}
+.bottom-nav .nav-item i { font-size: 20px; }
+.bottom-nav .nav-item.active { color: var(--primary); }
+
+/* ─── VIEWS & COMPONENTS ─── */
+.view-section { display: none; animation: fadeIn 0.3s ease; }
+.view-section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.page-header h1 { font-size: 24px; }
+
+.btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.btn-primary { background: var(--primary); color: white; }
+.icon-btn { background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; }
+
+.stats-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+.stat-card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+.stat-title { color: var(--text-muted); font-size: 14px; display: block; margin-bottom: 8px; }
+.stat-value { font-size: 28px; color: var(--text-main); }
+
+.card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+.empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; }
+
+/* ─── PRODUCT GRID ─── */
+.product-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+@media (min-width: 768px) { .product-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
+.product-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; gap: 15px; align-items: center; }
+.product-card img { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; background: #f1f5f9; }
+.product-info { flex: 1; overflow: hidden; }
+.product-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.product-price { font-weight: bold; color: var(--text-main); }
+.product-stock { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: #e2e8f0; }
+.product-stock.low { background: #fee2e2; color: var(--danger); }
+
+/* ─── MODAL & FORMS (NEW) ─── */
+.modal-overlay { 
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+  background: rgba(15, 23, 42, 0.6); z-index: 2000; 
+  display: none; justify-content: center; align-items: center; 
+  padding: 20px;
+}
+.modal-overlay.active { display: flex; animation: fadeIn 0.2s ease; }
+.modal { 
+  background: var(--card-bg); width: 100%; max-width: 500px; 
+  border-radius: 16px; padding: 25px; max-height: 90vh; overflow-y: auto; 
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.form-group { margin-bottom: 15px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); }
+.form-input { 
+  width: 100%; padding: 12px; border: 1px solid var(--border); 
+  border-radius: 8px; font-size: 15px; font-family: inherit; outline: none; 
+}
+.form-input:focus { border-color: var(--primary); }
+.file-upload-box { border: 2px dashed var(--border); padding: 15px; border-radius: 8px; text-align: center; background: var(--bg-color); }
+
+/* ─── TOAST NOTIFICATIONS (NEW) ─── */
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+.toast { background: var(--text-main); color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; font-weight: 500; display: flex; gap: 10px; align-items: center; animation: slideIn 0.3s ease; }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* ─── RESPONSIVE (DESKTOP MODE) ─── */
+@media (min-width: 768px) {
+  .app-header { display: none; } 
+  .bottom-nav { display: none; } 
+  .desktop-sidebar { display: flex; } 
+  .main-content { padding: 30px; }
+}
