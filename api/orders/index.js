@@ -82,7 +82,13 @@ module.exports = async (req, res) => {
 
     // GET ORDERS
     if (req.method === 'GET') {
-      // Admin - get all orders
+      // 1. SECURE EVERYTHING FIRST: Check token before doing anything
+      const decoded = verifyToken(req.headers.authorization);
+      if (!decoded) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+
+      // 2. Admin - get all orders
       if (admin === 'true') {
         const orders = await Order.find()
           .populate('userId', 'name email')
@@ -92,21 +98,14 @@ module.exports = async (req, res) => {
         return res.status(200).json(orders);
       }
 
-      // User - get own orders
-      const decoded = verifyToken(req.headers.authorization);
-      if (!decoded) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
+      // 3. User - get own orders
       if (id) {
         // Single order
         const order = await Order.findOne({ 
           orderId: id,
           userId: decoded.userId 
         });
-        if (!order) {
-          return res.status(404).json({ error: 'Order not found' });
-        }
+        if (!order) return res.status(404).json({ error: 'Order not found' });
         return res.status(200).json(order);
       }
 
@@ -117,7 +116,6 @@ module.exports = async (req, res) => {
       console.log('User fetched orders:', orders.length);
       return res.status(200).json(orders);
     }
-
     // CREATE ORDER
     if (req.method === 'POST') {
       const decoded = verifyToken(req.headers.authorization);
