@@ -7,7 +7,7 @@ if (!localStorage.getItem('admin_token') && !window.location.href.includes('logi
     window.location.href = 'login.html';
 }
 
-const API_BASE = 'https://admin.kidocart.shop'; 
+const API_BASE = ''; // Blank because frontend and backend are now hosted together on Vercel
 let allProducts = [];
 let cachedImgbbKey = null;
 
@@ -46,6 +46,7 @@ function initNavigation() {
 
             if(targetId === 'dashboard-view') loadDashboardData();
             if(targetId === 'products-view') loadProductsData();
+            if(targetId === 'customers-view') loadCustomersData();
         });
     });
 }
@@ -66,7 +67,7 @@ async function loadDashboardData() {
         const token = localStorage.getItem('admin_token'); 
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        // Fetch Products & Orders in parallel. (FIX APPLIED: Added ?admin=true to orders)
+        // Fetch Products & Orders in parallel.
         const [prodRes, orderRes] = await Promise.all([
             fetch(`${API_BASE}/api/products`, { headers }),
             fetch(`${API_BASE}/api/orders?admin=true`, { headers }) 
@@ -96,6 +97,34 @@ async function loadDashboardData() {
         document.getElementById('dash-sales').textContent = "Error";
         document.getElementById('dash-pending').textContent = "Error";
         document.getElementById('dash-stock').textContent = "Error";
+    }
+}
+
+// ─── CUSTOMERS LOGIC ───
+async function loadCustomersData() {
+    const container = document.getElementById('customers-view');
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/users`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) throw new Error("Failed");
+        const users = await res.json();
+        
+        container.innerHTML = `
+            <div class="page-header"><h1>Customers</h1></div>
+            <div class="product-grid">
+                ${users.map(u => `
+                    <div class="card">
+                        <div style="font-weight:600">${u.name || 'No Name'}</div>
+                        <div style="font-size:12px; color:var(--text-muted)">${u.email}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (error) {
+        showToast('Error loading customers', 'error');
     }
 }
 
