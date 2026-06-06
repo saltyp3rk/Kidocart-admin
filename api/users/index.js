@@ -1,4 +1,3 @@
-
 // Vercel Serverless Function - Users API
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -59,25 +58,42 @@ module.exports = async (req, res) => {
 
     const { action } = req.query;
 
-    // REGISTER
+    // ─── ADMIN DASHBOARD: GET ALL CUSTOMERS ───
+    // If it's a GET request and there is NO action parameter, it's the Admin app asking for the list.
+    if (req.method === 'GET' && !action) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        // Verify the VIP admin token
+        jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+        
+        // Fetch all users but hide their passwords
+        const users = await User.find({}).sort({ createdAt: -1 }).select('-password');
+        return res.status(200).json(users);
+      } catch (err) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+    }
+
+    // ─── STOREFRONT: REGISTER ───
     if (req.method === 'POST' && action === 'register') {
       const { name, email, password, phone } = req.body;
 
-      // Validate input
       if (!name || !email || !password) {
         return res.status(400).json({ error: 'Please provide name, email, and password' });
       }
 
-      // Check if user exists
       const existingUser = await User.findOne({ email });
       if (existingUser) {
         return res.status(400).json({ error: 'Email already registered' });
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
       const user = new User({
         name,
         email,
@@ -88,7 +104,6 @@ module.exports = async (req, res) => {
 
       await user.save();
 
-      // Generate token
       const token = jwt.sign(
         { userId: user._id, email: user.email },
         process.env.JWT_SECRET || 'fallback-secret-key',
@@ -109,7 +124,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // LOGIN
+    // ─── STOREFRONT: LOGIN ───
     if (req.method === 'POST' && action === 'login') {
       const { email, password } = req.body;
 
@@ -122,7 +137,6 @@ module.exports = async (req, res) => {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      // Check if user registered with Google
       if (user.provider === 'google' && !user.password) {
         return res.status(401).json({ error: 'Please login with Google' });
       }
@@ -153,7 +167,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // GOOGLE LOGIN
+    // ─── STOREFRONT: GOOGLE LOGIN ───
     if (req.method === 'POST' && action === 'google') {
       const { googleId, email, name, picture } = req.body;
 
@@ -164,7 +178,6 @@ module.exports = async (req, res) => {
       let user = await User.findOne({ email });
 
       if (!user) {
-        // Create new user
         user = new User({
           name,
           email,
@@ -175,7 +188,6 @@ module.exports = async (req, res) => {
         await user.save();
         console.log('New Google user:', email);
       } else if (!user.googleId) {
-        // Link Google account
         user.googleId = googleId;
         user.picture = picture;
         await user.save();
@@ -202,7 +214,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // GET PROFILE
+    // ─── STOREFRONT: GET PROFILE ───
     if (req.method === 'GET' && action === 'profile') {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -220,7 +232,7 @@ module.exports = async (req, res) => {
       return res.status(200).json(user);
     }
 
-    // UPDATE PROFILE
+    // ─── STOREFRONT: UPDATE PROFILE ───
     if (req.method === 'PUT' && action === 'profile') {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -231,7 +243,7 @@ module.exports = async (req, res) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
       
       const updates = req.body;
-      delete updates.password; // Don't allow password update here
+      delete updates.password; 
 
       const user = await User.findByIdAndUpdate(
         decoded.userId,
