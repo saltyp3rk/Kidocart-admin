@@ -7,7 +7,7 @@ if (!localStorage.getItem('admin_token') && !window.location.href.includes('logi
     window.location.href = 'login.html';
 }
 
-const API_BASE = ''; // Blank because frontend and backend are now hosted together on Vercel
+const API_BASE = ''; // Blank because frontend and backend are hosted together
 let allProducts = [];
 let cachedImgbbKey = null;
 
@@ -47,6 +47,7 @@ function initNavigation() {
             if(targetId === 'dashboard-view') loadDashboardData();
             if(targetId === 'products-view') loadProductsData();
             if(targetId === 'customers-view') loadCustomersData();
+            if(targetId === 'orders-view') loadOrdersData(); // RESTORED ORDERS TRIGGER
         });
     });
 }
@@ -58,7 +59,6 @@ function logout() {
 
 // ─── DASHBOARD ───
 async function loadDashboardData() {
-    // Show loading spinners visually
     document.getElementById('dash-sales').innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size: 20px;"></i>';
     document.getElementById('dash-pending').innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size: 20px;"></i>';
     document.getElementById('dash-stock').innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size: 20px;"></i>';
@@ -67,7 +67,6 @@ async function loadDashboardData() {
         const token = localStorage.getItem('admin_token'); 
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        // Fetch Products & Orders in parallel.
         const [prodRes, orderRes] = await Promise.all([
             fetch(`${API_BASE}/api/products`, { headers }),
             fetch(`${API_BASE}/api/orders?admin=true`, { headers }) 
@@ -100,7 +99,7 @@ async function loadDashboardData() {
     }
 }
 
-// ─── CUSTOMERS LOGIC ───
+// ─── CUSTOMERS ───
 async function loadCustomersData() {
     const container = document.getElementById('customers-view');
     try {
@@ -125,6 +124,94 @@ async function loadCustomersData() {
         `;
     } catch (error) {
         showToast('Error loading customers', 'error');
+    }
+}
+
+// ─── ORDERS (RESTORED) ───
+async function loadOrdersData() {
+    const list = document.getElementById('orders-view');
+    list.innerHTML = `
+        <div class="page-header"><h1>Orders</h1></div>
+        <div class="card empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading orders...</p></div>
+    `;
+
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/orders?admin=true`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to load orders");
+        const orders = await res.json();
+        renderOrders(orders);
+    } catch (error) {
+        list.innerHTML = `<div class="page-header"><h1>Orders</h1></div><div class="card empty-state">Error loading orders</div>`;
+    }
+}
+
+function renderOrders(orders) {
+    const list = document.getElementById('orders-view');
+    if (orders.length === 0) {
+        list.innerHTML = `
+            <div class="page-header"><h1>Orders</h1></div>
+            <div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found</p></div>
+        `;
+        return;
+    }
+
+    const ordersHtml = orders.map(o => {
+        const date = new Date(o.createdAt).toLocaleDateString('en-IN');
+        let statusColor = o.status === 'pending' ? 'var(--warning)' : (o.status === 'delivered' ? 'var(--success)' : 'var(--primary)');
+        let orderIdDisplay = o.orderId || (o._id ? o._id.substring(0,8).toUpperCase() : 'N/A');
+
+        return `
+            <div class="card" style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <strong>Order #${orderIdDisplay}</strong>
+                    <span style="color: ${statusColor}; font-weight: bold; text-transform: capitalize;">${o.status}</span>
+                </div>
+                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 15px;">
+                    <div>Date: ${date}</div>
+                    <div>Total: ₹${o.total}</div>
+                    ${o.shippingAddress ? `<div>Customer: ${o.shippingAddress.firstName} ${o.shippingAddress.lastName}</div>` : ''}
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <select class="form-input" style="padding: 8px; font-size: 14px; flex: 1;" onchange="updateOrderStatus('${o._id}', this.value)">
+                        <option value="" disabled selected>Update Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    list.innerHTML = `
+        <div class="page-header"><h1>Orders</h1></div>
+        ${ordersHtml}
+    `;
+}
+
+async function updateOrderStatus(orderId, newStatus) {
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/orders?orderId=${orderId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        if (!res.ok) throw new Error("Failed to update status");
+        showToast("Order status updated!");
+        loadOrdersData(); // Refresh list to show new colors
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 
@@ -159,7 +246,6 @@ function renderProducts(products) {
         let stockClass = p.stock <= 10 ? 'low' : '';
         let oldPriceHtml = p.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 11px; margin-right: 5px;">₹${p.originalPrice}</span>` : '';
         
-        // Grab ID safely
         const pId = p._id || p.id;
 
         return `
@@ -255,14 +341,12 @@ document.getElementById('product-form').addEventListener('submit', async functio
         let imageUrls = [];
         const fileInput = document.getElementById('modal-images');
         
-        // Handle images: If new ones selected, upload them.
         if (fileInput.files.length > 0) {
             for (let file of fileInput.files) {
                 const url = await uploadToImgBB(file);
                 imageUrls.push(url);
             }
         } else if (productId) {
-            // If editing and no new images selected, keep existing images
             const existingProduct = allProducts.find(p => (p._id || p.id) === productId);
             imageUrls = existingProduct.images || [];
         }
@@ -280,8 +364,6 @@ document.getElementById('product-form').addEventListener('submit', async functio
         };
 
         const token = localStorage.getItem('admin_token');
-        
-        // Dynamically choose POST (create) or PUT (update)
         const method = productId ? 'PUT' : 'POST';
         const url = productId ? `${API_BASE}/api/products?id=${productId}` : `${API_BASE}/api/products`;
 
@@ -294,11 +376,11 @@ document.getElementById('product-form').addEventListener('submit', async functio
             body: JSON.stringify(productData)
         });
 
-        if (!res.ok) throw new Error("Database save failed. Ensure your token is valid.");
+        if (!res.ok) throw new Error("Database save failed.");
 
         showToast(productId ? 'Product updated successfully!' : 'Product added successfully!');
         closeProductModal();
-        loadProductsData(); // Refresh the list
+        loadProductsData();
 
     } catch (error) {
         showToast(error.message, 'error');
