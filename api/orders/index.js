@@ -59,7 +59,6 @@ function verifyToken(authHeader) {
   if (!authHeader) return null;
   try {
     const token = authHeader.replace('Bearer ', '');
-    // FIX: Re-added your fallback secret key so it matches your login system!
     return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
   } catch (e) {
     return null;
@@ -79,31 +78,32 @@ module.exports = async (req, res) => {
   try {
     await connectToDatabase();
 
-    const { id, admin } = req.query;
+    // THE FIX: Capture both 'id' and 'orderId' to ensure nothing is missed
+    const { id, orderId, admin } = req.query;
+    const targetId = id || orderId; 
+
+    // SMART QUERY: Automatically detects if the frontend sent a Mongo _id or a custom ORD- id
+    const getSearchQuery = (searchStr) => {
+       return mongoose.Types.ObjectId.isValid(searchStr) ? { _id: searchStr } : { orderId: searchStr };
+    };
 
     // GET ORDERS
     if (req.method === 'GET') {
-      // 1. SECURE EVERYTHING FIRST: Check token before doing anything
       const decoded = verifyToken(req.headers.authorization);
-      if (!decoded) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
-      }
+      if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
-      // 2. Admin - get all orders
+      // Admin - get all orders
       if (admin === 'true') {
         const orders = await Order.find()
           .populate('userId', 'name email')
           .sort({ createdAt: -1 });
-        
-        console.log('Admin fetched orders:', orders.length);
         return res.status(200).json(orders);
       }
 
-      // 3. User - get own orders
-      if (id) {
-        // Single order
+      // Single order
+      if (targetId) {
         const order = await Order.findOne({ 
-          orderId: id,
+          ...getSearchQuery(targetId), 
           userId: decoded.userId 
         });
         if (!order) return res.status(404).json({ error: 'Order not found' });
@@ -111,74 +111,51 @@ module.exports = async (req, res) => {
       }
 
       // All user orders
-      const orders = await Order.find({ userId: decoded.userId })
-        .sort({ createdAt: -1 });
-      
-      console.log('User fetched orders:', orders.length);
+      const orders = await Order.find({ userId: decoded.userId }).sort({ createdAt: -1 });
       return res.status(200).json(orders);
     }
+
     // CREATE ORDER
     if (req.method === 'POST') {
       const decoded = verifyToken(req.headers.authorization);
-      if (!decoded) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
       const orderData = req.body;
-      
-      // Generate order ID
-      const orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+      const newOrderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 
       const order = new Order({
         ...orderData,
-        orderId,
+        orderId: newOrderId,
         userId: decoded.userId
       });
 
       await order.save();
-
-      console.log('Order created:', orderId);
-
       return res.status(201).json(order);
     }
 
     // UPDATE ORDER STATUS (Admin)
     if (req.method === 'PUT') {
-      if (!id) {
-        return res.status(400).json({ error: 'Order ID required' });
-      }
+      if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
       const updates = req.body;
       updates.updatedAt = new Date();
       
       const order = await Order.findOneAndUpdate(
-        { orderId: id },
+        getSearchQuery(targetId), // Applies the smart query here
         updates,
         { new: true }
       );
 
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      console.log('Order updated:', id, 'Status:', updates.status);
-
+      if (!order) return res.status(404).json({ error: 'Order not found' });
       return res.status(200).json(order);
     }
 
     // DELETE ORDER (Admin)
     if (req.method === 'DELETE') {
-      if (!id) {
-        return res.status(400).json({ error: 'Order ID required' });
-      }
+      if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
-      const order = await Order.findOneAndDelete({ orderId: id });
-
-      if (!order) {
-        return res.status(404).json({ error: 'Order not found' });
-      }
-
-      console.log('Order deleted:', id);
+      const order = await Order.findOneAndDelete(getSearchQuery(targetId));
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       return res.status(200).json({ message: 'Order deleted successfully' });
     }
