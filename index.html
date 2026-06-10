@@ -80,9 +80,21 @@
         <div class="page-header">
           <h1>Orders</h1>
         </div>
-        <div class="card empty-state">
-          <i class="fas fa-receipt"></i>
-          <p>Order list will go here</p>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+          <button class="btn-secondary" onclick="renderOrders('all')" style="border-radius: 20px; padding: 6px 16px;">All</button>
+          <button class="btn-secondary" onclick="renderOrders('pending')" style="border-radius: 20px; padding: 6px 16px;">Pending</button>
+          <button class="btn-secondary" onclick="renderOrders('processing')" style="border-radius: 20px; padding: 6px 16px;">Processing</button>
+          <button class="btn-secondary" onclick="renderOrders('shipped')" style="border-radius: 20px; padding: 6px 16px;">Shipped</button>
+          <button class="btn-secondary" onclick="renderOrders('delivered')" style="border-radius: 20px; padding: 6px 16px;">Delivered</button>
+          <button class="btn-secondary" onclick="renderOrders('cancelled')" style="border-radius: 20px; padding: 6px 16px;">Cancelled</button>
+        </div>
+
+        <div id="orders-list-container">
+          <div class="card empty-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading orders...</p>
+          </div>
         </div>
       </section>
       
