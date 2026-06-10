@@ -1,6 +1,25 @@
 // Vercel Serverless Function - Orders API
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
+
+// ─── FIREBASE ADMIN INITIALIZATION ───
+// Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Vercel
+if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // .replace is needed because Vercel sometimes escapes newlines in private keys
+        privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+      })
+    });
+    console.log('Firebase Admin Initialized');
+  } catch (error) {
+    console.error('Firebase Admin Init Error:', error);
+  }
+}
 
 // MongoDB connection
 let cachedDb = null;
@@ -65,6 +84,43 @@ function verifyToken(authHeader) {
   }
 }
 
+// ─── UTILITY: SEND FIREBASE MESSAGE ───
+async function sendFirebaseMessage(phone, status, orderId) {
+  if (!admin.apps.length) {
+    console.log('Firebase not configured in environment variables. Skipping SMS.');
+    return;
+  }
+
+  const shortId = (orderId || '').slice(-6);
+  let message = `Hi! Your KidoCart order #${shortId} is now ${status.toUpperCase()}.`;
+  if (status === 'shipped') message += ` It is on its way!`;
+  if (status === 'delivered') message += ` Enjoy your purchase!`;
+
+  try {
+    // If using Firebase "Send Messages" Extension:
+    // Writing to this collection triggers the extension to send the text message.
+    const db = admin.firestore();
+    const formattedPhone = phone.startsWith('+') ? phone : '+91' + phone;
+
+    await db.collection('messages').add({
+      to: formattedPhone,
+      body: message
+    });
+    console.log(`[FIREBASE] SMS queued in Firestore for ${formattedPhone}`);
+
+    /* NOTE: If you actually meant Firebase Cloud Messaging (FCM Push Notifications), 
+    you would use this code instead, but it requires saving device tokens in your DB:
+    
+    await admin.messaging().send({
+        token: 'USER_DEVICE_TOKEN_HERE',
+        notification: { title: 'Order Update', body: message }
+    });
+    */
+  } catch (err) {
+    console.error('[FIREBASE NOTIFICATION FAILED]', err);
+  }
+}
+
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -78,11 +134,11 @@ module.exports = async (req, res) => {
   try {
     await connectToDatabase();
 
-    // THE FIX: Capture both 'id' and 'orderId' to ensure nothing is missed
-    const { id, orderId, admin } = req.query;
+    // Capture both 'id' and 'orderId' to ensure nothing is missed
+    const { id, orderId, admin: isAdmin } = req.query;
     const targetId = id || orderId; 
 
-    // SMART QUERY: Automatically detects if the frontend sent a Mongo _id or a custom ORD- id
+    // SMART QUERY: Detects if frontend sent a Mongo _id or a custom ORD- id
     const getSearchQuery = (searchStr) => {
        return mongoose.Types.ObjectId.isValid(searchStr) ? { _id: searchStr } : { orderId: searchStr };
     };
@@ -93,7 +149,7 @@ module.exports = async (req, res) => {
       if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
       // Admin - get all orders
-      if (admin === 'true') {
+      if (isAdmin === 'true') {
         const orders = await Order.find()
           .populate('userId', 'name email')
           .sort({ createdAt: -1 });
@@ -141,12 +197,18 @@ module.exports = async (req, res) => {
       updates.updatedAt = new Date();
       
       const order = await Order.findOneAndUpdate(
-        getSearchQuery(targetId), // Applies the smart query here
+        getSearchQuery(targetId), 
         updates,
         { new: true }
       );
 
       if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      // 🔥 FIRE THE FIREBASE TEXT MESSAGE 🔥
+      if (updates.status && order.shippingAddress && order.shippingAddress.phone) {
+        sendFirebaseMessage(order.shippingAddress.phone, updates.status, order.orderId);
+      }
+
       return res.status(200).json(order);
     }
 
