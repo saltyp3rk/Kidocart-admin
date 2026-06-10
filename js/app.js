@@ -103,29 +103,167 @@ async function loadDashboardData() {
 // ─── CUSTOMERS ───
 async function loadCustomersData() {
     const container = document.getElementById('customers-view');
+    // Show loading state immediately
+    container.innerHTML = '<div class="page-header"><h1>Customers</h1></div><div class="card empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading customers...</p></div>';
+    
     try {
         const token = localStorage.getItem('admin_token');
-        const res = await fetch(`${API_BASE}/api/users`, {
+        // FIX: Added ?admin=true so the backend knows you want ALL users, not just your own profile
+        const res = await fetch(`${API_BASE}/api/users?admin=true`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!res.ok) throw new Error("Failed");
-        const users = await res.json();
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        const data = await res.json();
         
+        // Safety fallback in case your API returns an object { users: [] } instead of an array
+        const users = Array.isArray(data) ? data : (data.users || []);
+        
+        if (users.length === 0) {
+            container.innerHTML = `<div class="page-header"><h1>Customers</h1></div><div class="card empty-state"><p>No customers registered yet.</p></div>`;
+            return;
+        }
+
         container.innerHTML = `
             <div class="page-header"><h1>Customers</h1></div>
             <div class="product-grid">
                 ${users.map(u => `
-                    <div class="card">
-                        <div style="font-weight:600">${u.name || 'No Name'}</div>
-                        <div style="font-size:12px; color:var(--text-muted)">${u.email}</div>
+                    <div class="card" style="display:flex; align-items:center; gap: 16px;">
+                        <div style="background: var(--accent-light); color: var(--accent); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px;">
+                            ${(u.name || 'G')[0].toUpperCase()}
+                        </div>
+                        <div>
+                            <div style="font-weight:600; font-size: 15px;">${u.name || 'Guest User'}</div>
+                            <div style="font-size:13px; color:var(--text-muted)">${u.email}</div>
+                        </div>
                     </div>
                 `).join('')}
             </div>
         `;
     } catch (error) {
-        showToast('Error loading customers', 'error');
+        console.error("Customer Fetch Error:", error);
+        container.innerHTML = `<div class="page-header"><h1>Customers</h1></div><div class="card empty-state" style="color:var(--danger);">Error loading customers. Check console.</div>`;
     }
+}
+
+// ─── ORDERS (UPGRADED TAB UI) ───
+async function loadOrdersData() {
+    const list = document.getElementById('orders-view');
+    list.innerHTML = `
+        <div class="page-header"><h1>Orders</h1></div>
+        <div class="card empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading orders...</p></div>
+    `;
+
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/orders?admin=true`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to load orders");
+        allAdminOrders = await res.json();
+        renderOrdersList('all');
+    } catch (error) {
+        list.innerHTML = `<div class="page-header"><h1>Orders</h1></div><div class="card empty-state">Error loading orders</div>`;
+    }
+}
+
+// Render the orders with Sub-Tabs and Export
+window.renderOrdersList = function(filterStatus = 'all') {
+    const container = document.getElementById('orders-view');
+
+    const filteredOrders = filterStatus === 'all' 
+        ? allAdminOrders 
+        : allAdminOrders.filter(o => o.status === filterStatus);
+
+    // Helper function to style tabs
+    const getTabStyle = (statusName) => {
+        const isActive = filterStatus === statusName;
+        return `
+            padding: 10px 16px; 
+            cursor: pointer; 
+            background: none; 
+            border: none; 
+            font-size: 14px; 
+            font-weight: ${isActive ? 'bold' : '600'}; 
+            color: ${isActive ? 'var(--accent)' : 'var(--gray-500)'}; 
+            border-bottom: 2px solid ${isActive ? 'var(--accent)' : 'transparent'};
+            white-space: nowrap;
+            transition: 0.2s;
+        `;
+    };
+
+    // Build the Sub-Tab Header
+    const filterHTML = `
+        <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h1 style="margin: 0;">Orders</h1>
+            <button onclick="exportOrdersCSV()" style="background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+        
+        <div style="display: flex; gap: 4px; margin-bottom: 24px; overflow-x: auto; border-bottom: 1px solid var(--gray-200);">
+            <button onclick="renderOrdersList('all')" style="${getTabStyle('all')}">All Orders</button>
+            <button onclick="renderOrdersList('pending')" style="${getTabStyle('pending')}">Pending</button>
+            <button onclick="renderOrdersList('processing')" style="${getTabStyle('processing')}">Processing</button>
+            <button onclick="renderOrdersList('shipped')" style="${getTabStyle('shipped')}">Shipped</button>
+            <button onclick="renderOrdersList('delivered')" style="${getTabStyle('delivered')}">Delivered</button>
+            <button onclick="renderOrdersList('cancelled')" style="${getTabStyle('cancelled')}">Cancelled</button>
+        </div>
+    `;
+
+    if (filteredOrders.length === 0) {
+        container.innerHTML = filterHTML + `<div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found for this status</p></div>`;
+        return;
+    }
+
+    const ordersHtml = filteredOrders.map(o => {
+        const dateObj = new Date(o.createdAt);
+        const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        const custName = (o.shippingAddress && o.shippingAddress.name) 
+            ? o.shippingAddress.name 
+            : (o.shippingAddress && o.shippingAddress.firstName ? `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}` : 'Guest Customer');
+        const phone = (o.shippingAddress && o.shippingAddress.phone) ? o.shippingAddress.phone : 'N/A';
+
+        const txBadge = o.paymentMethod === 'razorpay' 
+            ? `<span style="background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">Txn: ${o.transactionId || o.paymentId || 'Online'}</span>`
+            : `<span style="background: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">COD</span>`;
+
+        const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+        let statusButtons = `<div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid #e5e5e5; padding-top: 16px; overflow-x: auto;">`;
+        statuses.forEach(s => {
+            let isActive = o.status === s 
+                ? 'background: var(--accent); color: white; border: 1px solid var(--accent);' 
+                : 'background: white; border: 1px solid #d4d4d4; color: #737373;';
+            statusButtons += `<button onclick="updateOrderStatus('${o.orderId || o._id}', '${s}')" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; transition: 0.2s; white-space: nowrap; ${isActive}">${s}</button>`;
+        });
+        statusButtons += `</div>`;
+
+        return `
+            <div class="card" style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">Order #${(o.orderId || '').replace('ORD-', '')}</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--gray-500);">${dateStr} at ${timeStr}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">₹${(o.total || 0).toLocaleString('en-IN')}</h3>
+                        <div style="margin-top: 6px;">${txBadge}</div>
+                        <button onclick="deleteAdminOrder('${o.orderId || o._id}')" style="margin-top: 8px; background: none; border: none; color: #EF4444; cursor: pointer; font-size: 12px; font-weight: bold;"><i class="fas fa-trash"></i> Delete Order</button>
+                    </div>
+                </div>
+                
+                <div style="font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+                    <strong>Customer:</strong> ${custName} <br>
+                    <strong>Phone:</strong> ${phone} <br>
+                    <strong>Items:</strong> ${o.items ? o.items.length : 0} items
+                </div>
+                ${statusButtons}
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = filterHTML + `<div id="orders-list-container">${ordersHtml}</div>`;
 }
 
 // ─── ORDERS (UPGRADED UI & LOGIC) ───
