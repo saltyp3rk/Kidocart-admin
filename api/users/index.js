@@ -68,8 +68,21 @@ module.exports = async (req, res) => {
 
       try {
         const token = authHeader.replace('Bearer ', '');
+        
         // Verify the VIP admin token
         jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+
+        // THE FIX: Actually fetch the users from the database!
+        // .select('-password') ensures we don't accidentally send hashed passwords to the frontend
+        const allUsers = await User.find().select('-password').sort({ createdAt: -1 });
+        
+        return res.status(200).json(allUsers);
+
+      } catch (error) {
+        console.error('Token Verification Error:', error);
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+    }
         
         // Fetch all users but hide their passwords
         const users = await User.find({}).sort({ createdAt: -1 }).select('-password');
