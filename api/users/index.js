@@ -27,19 +27,23 @@ const userSchema = new mongoose.Schema({
   picture: String,
   addresses: [{
     id: Number,
+    name: String, // Added to support your new checkout logic
     firstName: String,
     lastName: String,
     phone: String,
     address: String,
+    street: String, // Added to support your new checkout logic
+    apartment: String,
     address2: String,
     city: String,
     state: String,
     zip: String,
+    zipcode: String, // Added to support your new checkout logic
     country: String,
     isDefault: Boolean
   }],
   createdAt: { type: Date, default: Date.now }
-});
+}, { strict: false });
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
@@ -55,12 +59,10 @@ module.exports = async (req, res) => {
 
   try {
     await connectToDatabase();
-
-    const { action } = req.query;
+    const { action, admin } = req.query;
 
     // ─── ADMIN DASHBOARD: GET ALL CUSTOMERS ───
-    // If it's a GET request and there is NO action parameter, it's the Admin app asking for the list.
-    if (req.method === 'GET' && !action) {
+    if (req.method === 'GET' && (!action || admin === 'true')) {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
         return res.status(401).json({ error: 'No token provided' });
@@ -68,26 +70,12 @@ module.exports = async (req, res) => {
 
       try {
         const token = authHeader.replace('Bearer ', '');
-        
-        // Verify the VIP admin token
         jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
 
-        // THE FIX: Actually fetch the users from the database!
-        // .select('-password') ensures we don't accidentally send hashed passwords to the frontend
         const allUsers = await User.find().select('-password').sort({ createdAt: -1 });
-        
         return res.status(200).json(allUsers);
-
       } catch (error) {
         console.error('Token Verification Error:', error);
-        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
-      }
-    }
-        
-        // Fetch all users but hide their passwords
-        const users = await User.find({}).sort({ createdAt: -1 }).select('-password');
-        return res.status(200).json(users);
-      } catch (err) {
         return res.status(401).json({ error: 'Unauthorized: Invalid token' });
       }
     }
@@ -266,6 +254,29 @@ module.exports = async (req, res) => {
 
       console.log('Profile updated:', user.email);
 
+      return res.status(200).json(user);
+    }
+
+    // ─── STOREFRONT: ADD ADDRESS (Triggered during checkout) ───
+    if (req.method === 'POST' && action === 'add-address') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+
+      const token = authHeader.replace('Bearer ', '');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+      
+      const user = await User.findById(decoded.userId || decoded.id);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const newAddress = req.body;
+      if (newAddress.isDefault && user.addresses) {
+        user.addresses.forEach(a => a.isDefault = false);
+      }
+      
+      if (!user.addresses) user.addresses = [];
+      user.addresses.push(newAddress);
+      
+      await user.save();
       return res.status(200).json(user);
     }
 
