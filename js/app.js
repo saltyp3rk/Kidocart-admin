@@ -164,11 +164,11 @@ window.renderOrdersList = function(filterStatus = 'all') {
         <div class="page-header"><h1>Orders</h1></div>
         <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
             <button class="btn-secondary" onclick="renderOrdersList('all')" style="${filterStatus === 'all' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">All</button>
-            <button class="btn-secondary" onclick="renderOrdersList('pending')" style="${filterStatus === 'pending' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Pending</button>
-            <button class="btn-secondary" onclick="renderOrdersList('processing')" style="${filterStatus === 'processing' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Processing</button>
-            <button class="btn-secondary" onclick="renderOrdersList('shipped')" style="${filterStatus === 'shipped' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Shipped</button>
-            <button class="btn-secondary" onclick="renderOrdersList('delivered')" style="${filterStatus === 'delivered' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Delivered</button>
-            <button class="btn-secondary" onclick="renderOrdersList('cancelled')" style="${filterStatus === 'cancelled' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Cancelled</button>
+            <button class="btn-secondary" onclick="renderOrdersList('pending')" style="${filterStatus === 'pending' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Pending</button>
+            <button class="btn-secondary" onclick="renderOrdersList('processing')" style="${filterStatus === 'processing' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Processing</button>
+            <button class="btn-secondary" onclick="renderOrdersList('shipped')" style="${filterStatus === 'shipped' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Shipped</button>
+            <button class="btn-secondary" onclick="renderOrdersList('delivered')" style="${filterStatus === 'delivered' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Delivered</button>
+            <button class="btn-secondary" onclick="renderOrdersList('cancelled')" style="${filterStatus === 'cancelled' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Cancelled</button>
         </div>
     `;
 
@@ -199,7 +199,7 @@ window.renderOrdersList = function(filterStatus = 'all') {
         let statusButtons = `<div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid #e5e5e5; padding-top: 16px; overflow-x: auto;">`;
         statuses.forEach(s => {
             let isActive = o.status === s 
-                ? 'background: var(--accent); color: white; border: 1px solid var(--accent);' 
+                ? 'background: black; color: white; border: 1px solid var(--accent);' 
                 : 'background: white; border: 1px solid #d4d4d4; color: #737373;';
             statusButtons += `<button onclick="updateOrderStatus('${o.orderId || o._id}', '${s}')" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; transition: 0.2s; white-space: nowrap; ${isActive}">${s}</button>`;
         });
