@@ -163,7 +163,7 @@ window.renderOrdersList = function(filterStatus = 'all') {
     const filterHTML = `
         <div class="page-header"><h1>Orders</h1></div>
         <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
-            <button class="btn-secondary" onclick="renderOrdersList('all')" style="${filterStatus === 'all' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">All</button>
+            <button class="btn-secondary" onclick="renderOrdersList('all')" style="${filterStatus === 'all' ? 'background:var(--black);color:black;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">All</button>
             <button class="btn-secondary" onclick="renderOrdersList('pending')" style="${filterStatus === 'pending' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Pending</button>
             <button class="btn-secondary" onclick="renderOrdersList('processing')" style="${filterStatus === 'processing' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Processing</button>
             <button class="btn-secondary" onclick="renderOrdersList('shipped')" style="${filterStatus === 'shipped' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Shipped</button>
