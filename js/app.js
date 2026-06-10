@@ -9,6 +9,7 @@ if (!localStorage.getItem('admin_token') && !window.location.href.includes('logi
 
 const API_BASE = ''; // Blank because frontend and backend are hosted together
 let allProducts = [];
+let allAdminOrders = []; // NEW: Global state for sorting orders
 let cachedImgbbKey = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -47,7 +48,7 @@ function initNavigation() {
             if(targetId === 'dashboard-view') loadDashboardData();
             if(targetId === 'products-view') loadProductsData();
             if(targetId === 'customers-view') loadCustomersData();
-            if(targetId === 'orders-view') loadOrdersData(); // RESTORED ORDERS TRIGGER
+            if(targetId === 'orders-view') loadOrdersData(); 
         });
     });
 }
@@ -127,7 +128,7 @@ async function loadCustomersData() {
     }
 }
 
-// ─── ORDERS (RESTORED) ───
+// ─── ORDERS (UPGRADED UI & LOGIC) ───
 async function loadOrdersData() {
     const list = document.getElementById('orders-view');
     list.innerHTML = `
@@ -142,57 +143,92 @@ async function loadOrdersData() {
         });
 
         if (!res.ok) throw new Error("Failed to load orders");
-        const orders = await res.json();
-        renderOrders(orders);
+        allAdminOrders = await res.json();
+        renderOrdersList('all');
     } catch (error) {
         list.innerHTML = `<div class="page-header"><h1>Orders</h1></div><div class="card empty-state">Error loading orders</div>`;
     }
 }
 
-function renderOrders(orders) {
-    const list = document.getElementById('orders-view');
-    if (orders.length === 0) {
-        list.innerHTML = `
-            <div class="page-header"><h1>Orders</h1></div>
-            <div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found</p></div>
-        `;
+// Render the orders with the dynamic sorting buttons
+window.renderOrdersList = function(filterStatus = 'all') {
+    const container = document.getElementById('orders-view');
+
+    // Filter logic
+    const filteredOrders = filterStatus === 'all' 
+        ? allAdminOrders 
+        : allAdminOrders.filter(o => o.status === filterStatus);
+
+    // Build the Sorting Header
+    const filterHTML = `
+        <div class="page-header"><h1>Orders</h1></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+            <button class="btn-secondary" onclick="renderOrdersList('all')" style="${filterStatus === 'all' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">All</button>
+            <button class="btn-secondary" onclick="renderOrdersList('pending')" style="${filterStatus === 'pending' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Pending</button>
+            <button class="btn-secondary" onclick="renderOrdersList('processing')" style="${filterStatus === 'processing' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Processing</button>
+            <button class="btn-secondary" onclick="renderOrdersList('shipped')" style="${filterStatus === 'shipped' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Shipped</button>
+            <button class="btn-secondary" onclick="renderOrdersList('delivered')" style="${filterStatus === 'delivered' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Delivered</button>
+            <button class="btn-secondary" onclick="renderOrdersList('cancelled')" style="${filterStatus === 'cancelled' ? 'background:var(--black);color:white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Cancelled</button>
+        </div>
+    `;
+
+    if (filteredOrders.length === 0) {
+        container.innerHTML = filterHTML + `<div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found for this status</p></div>`;
         return;
     }
 
-    const ordersHtml = orders.map(o => {
-        const date = new Date(o.createdAt).toLocaleDateString('en-IN');
-        let statusColor = o.status === 'pending' ? 'var(--warning)' : (o.status === 'delivered' ? 'var(--success)' : 'var(--primary)');
-        let orderIdDisplay = o.orderId || (o._id ? o._id.substring(0,8).toUpperCase() : 'N/A');
+    const ordersHtml = filteredOrders.map(o => {
+        // Time Parsing
+        const dateObj = new Date(o.createdAt);
+        const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        // Name Formatting (Handles both old split names and new combined names)
+        const custName = (o.shippingAddress && o.shippingAddress.name) 
+            ? o.shippingAddress.name 
+            : (o.shippingAddress && o.shippingAddress.firstName ? `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}` : 'Guest Customer');
+        const phone = (o.shippingAddress && o.shippingAddress.phone) ? o.shippingAddress.phone : 'N/A';
+
+        // Transaction Badge
+        const txBadge = o.paymentMethod === 'razorpay' 
+            ? `<span style="background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">Txn: ${o.transactionId || o.paymentId || 'Online'}</span>`
+            : `<span style="background: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">COD</span>`;
+
+        // Horizontal Status Pills
+        const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+        let statusButtons = `<div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid #e5e5e5; padding-top: 16px; overflow-x: auto;">`;
+        statuses.forEach(s => {
+            let isActive = o.status === s 
+                ? 'background: var(--accent); color: white; border: 1px solid var(--accent);' 
+                : 'background: white; border: 1px solid #d4d4d4; color: #737373;';
+            statusButtons += `<button onclick="updateOrderStatus('${o.orderId || o._id}', '${s}')" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; transition: 0.2s; white-space: nowrap; ${isActive}">${s}</button>`;
+        });
+        statusButtons += `</div>`;
 
         return `
-            <div class="card" style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <strong>Order #${orderIdDisplay}</strong>
-                    <span style="color: ${statusColor}; font-weight: bold; text-transform: capitalize;">${o.status}</span>
+            <div class="card" style="margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">Order #${(o.orderId || '').replace('ORD-', '')}</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--gray-500);">${dateStr} at ${timeStr}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">₹${(o.total || 0).toLocaleString('en-IN')}</h3>
+                        <div style="margin-top: 6px;">${txBadge}</div>
+                    </div>
                 </div>
-                <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 15px;">
-                    <div>Date: ${date}</div>
-                    <div>Total: ₹${o.total}</div>
-                    ${o.shippingAddress ? `<div>Customer: ${o.shippingAddress.firstName} ${o.shippingAddress.lastName}</div>` : ''}
+                
+                <div style="font-size: 14px; color: var(--gray-700); line-height: 1.6;">
+                    <strong>Customer:</strong> ${custName} <br>
+                    <strong>Phone:</strong> ${phone} <br>
+                    <strong>Items:</strong> ${o.items ? o.items.length : 0} items
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <select class="form-input" style="padding: 8px; font-size: 14px; flex: 1;" onchange="updateOrderStatus('${o._id}', this.value)">
-                        <option value="" disabled selected>Update Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="processing">Processing</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-                </div>
+                ${statusButtons}
             </div>
         `;
     }).join('');
 
-    list.innerHTML = `
-        <div class="page-header"><h1>Orders</h1></div>
-        ${ordersHtml}
-    `;
+    container.innerHTML = filterHTML + `<div id="orders-list-container">${ordersHtml}</div>`;
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -208,8 +244,8 @@ async function updateOrderStatus(orderId, newStatus) {
         });
 
         if (!res.ok) throw new Error("Failed to update status");
-        showToast("Order status updated!");
-        loadOrdersData(); // Refresh list to show new colors
+        showToast(`Order marked as ${newStatus}`);
+        loadOrdersData(); // Refresh list to show new active pill
     } catch (error) {
         showToast(error.message, 'error');
     }
