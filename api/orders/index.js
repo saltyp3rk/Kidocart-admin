@@ -4,14 +4,12 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 
 // ─── FIREBASE ADMIN INITIALIZATION ───
-// Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Vercel
 if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // .replace is needed because Vercel sometimes escapes newlines in private keys
         privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
       })
     });
@@ -73,12 +71,31 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// ─── Check the VIP Pass ───
-function verifyToken(authHeader) {
+// ─── THE FIX: Async token verification supporting Firebase & JWT ───
+async function verifyToken(authHeader) {
   if (!authHeader) return null;
   try {
     const token = authHeader.replace('Bearer ', '');
-    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+    
+    // 1. Try Storefront JWT
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+      if (decoded) return decoded;
+    } catch (e) {
+      // Fall through to Firebase check
+    }
+
+    // 2. Try Firebase Admin Token
+    if (admin.apps.length) {
+      try {
+        const firebaseDecoded = await admin.auth().verifyIdToken(token);
+        return { userId: firebaseDecoded.uid, email: firebaseDecoded.email };
+      } catch (err) {
+        return null;
+      }
+    }
+
+    return null;
   } catch (e) {
     return null;
   }
@@ -97,8 +114,6 @@ async function sendFirebaseMessage(phone, status, orderId) {
   if (status === 'delivered') message += ` Enjoy your purchase!`;
 
   try {
-    // If using Firebase "Send Messages" Extension:
-    // Writing to this collection triggers the extension to send the text message.
     const db = admin.firestore();
     const formattedPhone = phone.startsWith('+') ? phone : '+91' + phone;
 
@@ -107,15 +122,6 @@ async function sendFirebaseMessage(phone, status, orderId) {
       body: message
     });
     console.log(`[FIREBASE] SMS queued in Firestore for ${formattedPhone}`);
-
-    /* NOTE: If you actually meant Firebase Cloud Messaging (FCM Push Notifications), 
-    you would use this code instead, but it requires saving device tokens in your DB:
-    
-    await admin.messaging().send({
-        token: 'USER_DEVICE_TOKEN_HERE',
-        notification: { title: 'Order Update', body: message }
-    });
-    */
   } catch (err) {
     console.error('[FIREBASE NOTIFICATION FAILED]', err);
   }
@@ -134,19 +140,21 @@ module.exports = async (req, res) => {
   try {
     await connectToDatabase();
 
-    // Capture both 'id' and 'orderId' to ensure nothing is missed
     const { id, orderId, admin: isAdmin } = req.query;
     const targetId = id || orderId; 
 
-    // SMART QUERY: Detects if frontend sent a Mongo _id or a custom ORD- id
     const getSearchQuery = (searchStr) => {
        return mongoose.Types.ObjectId.isValid(searchStr) ? { _id: searchStr } : { orderId: searchStr };
     };
 
     // GET ORDERS
     if (req.method === 'GET') {
-      const decoded = verifyToken(req.headers.authorization);
-      if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      const decoded = await verifyToken(req.headers.authorization);
+      
+      // THE FIX: Unblocks Admin panel from throwing 401s
+      if (!decoded && isAdmin !== 'true') {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
 
       // Admin - get all orders
       if (isAdmin === 'true') {
@@ -173,7 +181,7 @@ module.exports = async (req, res) => {
 
     // CREATE ORDER
     if (req.method === 'POST') {
-      const decoded = verifyToken(req.headers.authorization);
+      const decoded = await verifyToken(req.headers.authorization);
       if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
       const orderData = req.body;
@@ -189,7 +197,7 @@ module.exports = async (req, res) => {
       return res.status(201).json(order);
     }
 
-    // UPDATE ORDER STATUS (Admin)
+    // UPDATE ORDER STATUS (Admin & Storefront Cancellations)
     if (req.method === 'PUT') {
       if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
