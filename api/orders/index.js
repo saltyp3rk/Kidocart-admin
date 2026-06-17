@@ -4,12 +4,14 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 
 // ─── FIREBASE ADMIN INITIALIZATION ───
+// Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Vercel
 if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // .replace is needed because Vercel sometimes escapes newlines in private keys
         privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
       })
     });
@@ -77,25 +79,18 @@ async function verifyToken(authHeader) {
   try {
     const token = authHeader.replace('Bearer ', '');
     
-    // 1. Try Storefront JWT
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
-      if (decoded) return decoded;
-    } catch (e) {
-      // Fall through to Firebase check
-    }
-
-    // 2. Try Firebase Admin Token
-    if (admin.apps.length) {
+    // 1. Try Firebase Admin Token First (For Admin Panel)
+    if (admin.apps.length > 0) {
       try {
-        const firebaseDecoded = await admin.auth().verifyIdToken(token);
-        return { userId: firebaseDecoded.uid, email: firebaseDecoded.email };
-      } catch (err) {
-        return null;
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        return { userId: decodedToken.uid, email: decodedToken.email };
+      } catch (firebaseErr) {
+        // Fall through to JWT if Firebase fails
       }
     }
 
-    return null;
+    // 2. Try Standard JWT (For Storefront)
+    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
   } catch (e) {
     return null;
   }
@@ -149,12 +144,8 @@ module.exports = async (req, res) => {
 
     // GET ORDERS
     if (req.method === 'GET') {
-      const decoded = await verifyToken(req.headers.authorization);
-      
-      // THE FIX: Unblocks Admin panel from throwing 401s
-      if (!decoded && isAdmin !== 'true') {
-        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
-      }
+      const decoded = await verifyToken(req.headers.authorization); // Await the async token check
+      if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
       // Admin - get all orders
       if (isAdmin === 'true') {
@@ -181,7 +172,7 @@ module.exports = async (req, res) => {
 
     // CREATE ORDER
     if (req.method === 'POST') {
-      const decoded = await verifyToken(req.headers.authorization);
+      const decoded = await verifyToken(req.headers.authorization); // Await the async token check
       if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
       const orderData = req.body;
@@ -197,7 +188,7 @@ module.exports = async (req, res) => {
       return res.status(201).json(order);
     }
 
-    // UPDATE ORDER STATUS (Admin & Storefront Cancellations)
+    // UPDATE ORDER STATUS (Admin)
     if (req.method === 'PUT') {
       if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
