@@ -296,22 +296,39 @@ module.exports = async (req, res) => {
       return res.status(201).json(order);
     }
 
-    // UPDATE ORDER STATUS (Admin)
+// UPDATE ORDER STATUS (Admin & Storefront Cancellations)
     if (req.method === 'PUT') {
       if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
       const updates = req.body;
       updates.updatedAt = new Date();
       
-      const order = await Order.findOneAndUpdate(
-        getSearchQuery(targetId), 
-        updates,
-        { new: true }
-      );
-
+      const order = await Order.findOne(getSearchQuery(targetId));
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      // 🔥 FIRE THE FIREBASE TEXT MESSAGE 🔥
+      // If the admin changes the status to processing, create the Delhivery shipment!
+      if (updates.status === 'processing' && !order.trackingNumber) {
+         const awbNumber = await createDelhiveryShipment(order);
+         if (awbNumber) {
+            updates.trackingNumber = awbNumber; // Save tracking number to DB
+         }
+      }
+
+      // Handle storefront cancellations securely
+      if (req.url.includes('/cancel')) {
+        if (['delivered', 'cancelled', 'shipped'].includes(order.status)) {
+          return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
+        }
+        order.status = 'cancelled';
+        if (req.body.cancelReason) order.cancelReason = req.body.cancelReason;
+      } else {
+        // Standard admin updates
+        Object.assign(order, updates);
+      }
+      
+      await order.save();
+
+      // FIRE THE FIREBASE TEXT MESSAGE
       if (updates.status && order.shippingAddress && order.shippingAddress.phone) {
         sendFirebaseMessage(order.shippingAddress.phone, updates.status, order.orderId);
       }
