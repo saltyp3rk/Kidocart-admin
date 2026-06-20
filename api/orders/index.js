@@ -73,24 +73,30 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// ─── THE FIX: Async token verification supporting Firebase & JWT ───
+// ─── Check the VIP Pass (FIXED for Admin Firebase Tokens) ───
 async function verifyToken(authHeader) {
   if (!authHeader) return null;
   try {
     const token = authHeader.replace('Bearer ', '');
     
-    // 1. Try Firebase Admin Token First (For Admin Panel)
-    if (admin.apps.length > 0) {
-      try {
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        return { userId: decodedToken.uid, email: decodedToken.email };
-      } catch (firebaseErr) {
-        // Fall through to JWT if Firebase fails
-      }
+    // 1. Try Storefront JWT
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+      if (decoded) return decoded;
+    } catch (e) {
+      // Ignore and fall through to Firebase
     }
 
-    // 2. Try Standard JWT (For Storefront)
-    return jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
+    // 2. Try Admin Firebase Token
+    if (admin.apps.length > 0) {
+      try {
+        const firebaseDecoded = await admin.auth().verifyIdToken(token);
+        return { userId: firebaseDecoded.uid, email: firebaseDecoded.email };
+      } catch (err) {
+        return null;
+      }
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -109,6 +115,8 @@ async function sendFirebaseMessage(phone, status, orderId) {
   if (status === 'delivered') message += ` Enjoy your purchase!`;
 
   try {
+    // If using Firebase "Send Messages" Extension:
+    // Writing to this collection triggers the extension to send the text message.
     const db = admin.firestore();
     const formattedPhone = phone.startsWith('+') ? phone : '+91' + phone;
 
@@ -117,6 +125,15 @@ async function sendFirebaseMessage(phone, status, orderId) {
       body: message
     });
     console.log(`[FIREBASE] SMS queued in Firestore for ${formattedPhone}`);
+
+    /* NOTE: If you actually meant Firebase Cloud Messaging (FCM Push Notifications), 
+    you would use this code instead, but it requires saving device tokens in your DB:
+    
+    await admin.messaging().send({
+        token: 'USER_DEVICE_TOKEN_HERE',
+        notification: { title: 'Order Update', body: message }
+    });
+    */
   } catch (err) {
     console.error('[FIREBASE NOTIFICATION FAILED]', err);
   }
@@ -135,16 +152,18 @@ module.exports = async (req, res) => {
   try {
     await connectToDatabase();
 
+    // Capture both 'id' and 'orderId' to ensure nothing is missed
     const { id, orderId, admin: isAdmin } = req.query;
     const targetId = id || orderId; 
 
+    // SMART QUERY: Detects if frontend sent a Mongo _id or a custom ORD- id
     const getSearchQuery = (searchStr) => {
        return mongoose.Types.ObjectId.isValid(searchStr) ? { _id: searchStr } : { orderId: searchStr };
     };
 
     // GET ORDERS
     if (req.method === 'GET') {
-      const decoded = await verifyToken(req.headers.authorization); // Await the async token check
+      const decoded = await verifyToken(req.headers.authorization); // SURGICAL FIX: Added await
       if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
       // Admin - get all orders
@@ -172,7 +191,7 @@ module.exports = async (req, res) => {
 
     // CREATE ORDER
     if (req.method === 'POST') {
-      const decoded = await verifyToken(req.headers.authorization); // Await the async token check
+      const decoded = await verifyToken(req.headers.authorization); // SURGICAL FIX: Added await
       if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
       const orderData = req.body;
