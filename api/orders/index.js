@@ -118,7 +118,7 @@ async function createDelhiveryShipment(order) {
 // ─── ORDER SCHEMA (FIXED: Added missing tracking and tracking/cancellation fields) ───
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, unique: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userId: String,
   items: [{
     productId: String,
     name: String,
