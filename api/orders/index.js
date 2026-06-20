@@ -50,12 +50,7 @@ async function createDelhiveryShipment(order) {
 
   const payload = {
     pickup_location: {
-      name: "Farzan Online Services", 
-      add: "Farzan Online Service Plot No. 47/B, Survey No. 105/A, Gulshane Masoom", 
-      city: "Malegaon",
-      pin: "423203",
-      country: "India",
-      phone: "9370538787" 
+      name: "Domestic Pickup Location" // This now matches your Delhivery Dashboard exactly!
     },
     shipments: [
       {
@@ -68,12 +63,10 @@ async function createDelhiveryShipment(order) {
         phone: order.phone || addr.phone,
         order: order.orderId || order._id.toString(),
         payment_mode: order.paymentMethod === 'cod' ? 'COD' : 'Pre-paid',
-        return_pin: "423203",
-        return_city: "Malegaon",
-        return_phone: "9370538787",
-        return_add: "Farzan Online Service Plot No. 47/B, Survey No. 105/A, Gulshane Masoom",
-        return_state: "Maharashtra",
-        return_country: "India",
+        
+        // We removed the return_ address block because your dashboard 
+        // handles returns to the same origin automatically.
+        
         products_desc: "KidoCart Products",
         hsn_code: "4820", 
         cod_amount: order.paymentMethod === 'cod' ? order.total : 0,
@@ -86,7 +79,6 @@ async function createDelhiveryShipment(order) {
       }
     ]
   };
-
   try {
     const bodyString = `format=json&data=${JSON.stringify(payload)}`;
 
