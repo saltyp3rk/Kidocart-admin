@@ -106,7 +106,7 @@ async function createDelhiveryShipment(order) {
        console.log('Delhivery Success! AWB:', data.packages[0].waybill);
        return data.packages[0].waybill; 
     } else {
-       console.error('Delhivery Rejected Order:', data);
+       console.error('Delhivery Rejected Order:', JSON.stringify(data, null, 2));
        return null;
     }
   } catch (error) {
