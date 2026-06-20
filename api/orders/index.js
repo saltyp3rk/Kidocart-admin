@@ -4,14 +4,12 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 
 // ─── FIREBASE ADMIN INITIALIZATION ───
-// Requires FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Vercel
 if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // .replace is needed because Vercel sometimes escapes newlines in private keys
         privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
       })
     });
@@ -36,10 +34,7 @@ async function connectToDatabase() {
 
 // ─── DELHIVERY B2C SHIPMENT CREATION ───
 async function createDelhiveryShipment(order) {
-  // Add this to your Vercel Environment Variables
   const DELHIVERY_TOKEN = process.env.DELHIVERY_TOKEN; 
-  
-  // Use staging-express.delhivery.com for testing, track.delhivery.com for LIVE
   const DELHIVERY_URL = 'https://track.delhivery.com/api/cmu/create.json';
 
   if (!DELHIVERY_TOKEN) {
@@ -53,10 +48,9 @@ async function createDelhiveryShipment(order) {
   const fullName = `${fName} ${lName}`.trim() || 'Customer';
   const fullAddress = `${addr.address || ''} ${addr.apartment || addr.address2 || ''}`.trim();
 
-  // Delhivery strictly demands this JSON structure
   const payload = {
     pickup_location: {
-      name: "Farzan Online Services", // WARNING: Must exactly match the name registered in your Delhivery Dashboard!
+      name: "Farzan Online Services", 
       add: "Farzan Online Service Plot No. 47/B, Survey No. 105/A, Gulshane Masoom", 
       city: "Malegaon",
       pin: "423203",
@@ -81,7 +75,7 @@ async function createDelhiveryShipment(order) {
         return_state: "Maharashtra",
         return_country: "India",
         products_desc: "KidoCart Products",
-        hsn_code: "4820", // Update with your actual GST HSN code
+        hsn_code: "4820", 
         cod_amount: order.paymentMethod === 'cod' ? order.total : 0,
         order_date: new Date(order.createdAt).toISOString().split('T')[0],
         total_amount: order.total,
@@ -94,7 +88,6 @@ async function createDelhiveryShipment(order) {
   };
 
   try {
-    // Delhivery's mandatory formatting quirk
     const bodyString = `format=json&data=${JSON.stringify(payload)}`;
 
     const response = await fetch(DELHIVERY_URL, {
@@ -109,7 +102,6 @@ async function createDelhiveryShipment(order) {
 
     const data = await response.json();
     
-    // If Delhivery accepts it, they return the Waybill (Tracking Number)
     if (data.success === true && data.packages && data.packages.length > 0) {
        console.log('Delhivery Success! AWB:', data.packages[0].waybill);
        return data.packages[0].waybill; 
@@ -123,7 +115,7 @@ async function createDelhiveryShipment(order) {
   }
 }
 
-// Order Schema
+// ─── ORDER SCHEMA (FIXED: Added missing tracking and tracking/cancellation fields) ───
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -156,27 +148,30 @@ const orderSchema = new mongoose.Schema({
   paymentId: String,
   paymentStatus: { type: String, default: 'pending' },
   status: { type: String, default: 'confirmed' },
+  
+  // FIXED: Explicitly added so Mongoose saves them to MongoDB
+  trackingNumber: String, 
+  cancelReason: String,   
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// ─── Check the VIP Pass (FIXED for Admin Firebase Tokens) ───
+// ─── TOKEN VERIFICATION ───
 async function verifyToken(authHeader) {
   if (!authHeader) return null;
   try {
     const token = authHeader.replace('Bearer ', '');
     
-    // 1. Try Storefront JWT
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
       if (decoded) return decoded;
     } catch (e) {
-      // Ignore and fall through to Firebase
+      // Fall through to Firebase
     }
 
-    // 2. Try Admin Firebase Token
     if (admin.apps.length > 0) {
       try {
         const firebaseDecoded = await admin.auth().verifyIdToken(token);
@@ -194,7 +189,7 @@ async function verifyToken(authHeader) {
 // ─── UTILITY: SEND FIREBASE MESSAGE ───
 async function sendFirebaseMessage(phone, status, orderId) {
   if (!admin.apps.length) {
-    console.log('Firebase not configured in environment variables. Skipping SMS.');
+    console.log('Firebase not configured. Skipping SMS.');
     return;
   }
 
@@ -204,8 +199,6 @@ async function sendFirebaseMessage(phone, status, orderId) {
   if (status === 'delivered') message += ` Enjoy your purchase!`;
 
   try {
-    // If using Firebase "Send Messages" Extension:
-    // Writing to this collection triggers the extension to send the text message.
     const db = admin.firestore();
     const formattedPhone = phone.startsWith('+') ? phone : '+91' + phone;
 
@@ -214,22 +207,13 @@ async function sendFirebaseMessage(phone, status, orderId) {
       body: message
     });
     console.log(`[FIREBASE] SMS queued in Firestore for ${formattedPhone}`);
-
-    /* NOTE: If you actually meant Firebase Cloud Messaging (FCM Push Notifications), 
-    you would use this code instead, but it requires saving device tokens in your DB:
-    
-    await admin.messaging().send({
-        token: 'USER_DEVICE_TOKEN_HERE',
-        notification: { title: 'Order Update', body: message }
-    });
-    */
   } catch (err) {
     console.error('[FIREBASE NOTIFICATION FAILED]', err);
   }
 }
 
+// ─── MAIN EXPORT ───
 module.exports = async (req, res) => {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -241,21 +225,18 @@ module.exports = async (req, res) => {
   try {
     await connectToDatabase();
 
-    // Capture both 'id' and 'orderId' to ensure nothing is missed
     const { id, orderId, admin: isAdmin } = req.query;
     const targetId = id || orderId; 
 
-    // SMART QUERY: Detects if frontend sent a Mongo _id or a custom ORD- id
     const getSearchQuery = (searchStr) => {
        return mongoose.Types.ObjectId.isValid(searchStr) ? { _id: searchStr } : { orderId: searchStr };
     };
 
     // GET ORDERS
     if (req.method === 'GET') {
-      const decoded = await verifyToken(req.headers.authorization); // SURGICAL FIX: Added await
+      const decoded = await verifyToken(req.headers.authorization);
       if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
-      // Admin - get all orders
       if (isAdmin === 'true') {
         const orders = await Order.find()
           .populate('userId', 'name email')
@@ -263,7 +244,6 @@ module.exports = async (req, res) => {
         return res.status(200).json(orders);
       }
 
-      // Single order
       if (targetId) {
         const order = await Order.findOne({ 
           ...getSearchQuery(targetId), 
@@ -273,14 +253,13 @@ module.exports = async (req, res) => {
         return res.status(200).json(order);
       }
 
-      // All user orders
       const orders = await Order.find({ userId: decoded.userId }).sort({ createdAt: -1 });
       return res.status(200).json(orders);
     }
 
     // CREATE ORDER
     if (req.method === 'POST') {
-      const decoded = await verifyToken(req.headers.authorization); // SURGICAL FIX: Added await
+      const decoded = await verifyToken(req.headers.authorization);
       if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
       const orderData = req.body;
@@ -296,47 +275,46 @@ module.exports = async (req, res) => {
       return res.status(201).json(order);
     }
 
-// UPDATE ORDER STATUS (Admin & Storefront Cancellations)
+    // UPDATE ORDER STATUS (FIXED LOGIC BLOCK)
     if (req.method === 'PUT') {
       if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
       const updates = req.body;
-      updates.updatedAt = new Date();
-      
       const order = await Order.findOne(getSearchQuery(targetId));
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      // If the admin changes the status to processing, create the Delhivery shipment!
+      // Trigger Delhivery shipping if status switches to processing
       if (updates.status === 'processing' && !order.trackingNumber) {
          const awbNumber = await createDelhiveryShipment(order);
          if (awbNumber) {
-            updates.trackingNumber = awbNumber; // Save tracking number to DB
+            order.trackingNumber = awbNumber; 
          }
       }
 
-      // Handle storefront cancellations securely
+      // Handle storefront cancellations securely vs standard admin updates
       if (req.url.includes('/cancel')) {
         if (['delivered', 'cancelled', 'shipped'].includes(order.status)) {
           return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
         }
         order.status = 'cancelled';
-        if (req.body.cancelReason) order.cancelReason = req.body.cancelReason;
+        if (updates.cancelReason) order.cancelReason = updates.cancelReason;
       } else {
-        // Standard admin updates
         Object.assign(order, updates);
       }
       
+      // FIXED: Ensures timestamp updates correctly on all execution paths
+      order.updatedAt = new Date(); 
       await order.save();
 
-      // FIRE THE FIREBASE TEXT MESSAGE
-      if (updates.status && order.shippingAddress && order.shippingAddress.phone) {
-        sendFirebaseMessage(order.shippingAddress.phone, updates.status, order.orderId);
+      // FIXED: Looks directly at the finalized order status so cancellation SMS works
+      if (order.status && order.shippingAddress && order.shippingAddress.phone) {
+        sendFirebaseMessage(order.shippingAddress.phone, order.status, order.orderId);
       }
 
       return res.status(200).json(order);
     }
 
-    // DELETE ORDER (Admin)
+    // DELETE ORDER
     if (req.method === 'DELETE') {
       if (!targetId) return res.status(400).json({ error: 'Order ID required' });
 
