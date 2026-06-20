@@ -34,6 +34,95 @@ async function connectToDatabase() {
   return cachedDb;
 }
 
+// ─── DELHIVERY B2C SHIPMENT CREATION ───
+async function createDelhiveryShipment(order) {
+  // Add this to your Vercel Environment Variables
+  const DELHIVERY_TOKEN = process.env.DELHIVERY_TOKEN; 
+  
+  // Use staging-express.delhivery.com for testing, track.delhivery.com for LIVE
+  const DELHIVERY_URL = 'https://track.delhivery.com/api/cmu/create.json';
+
+  if (!DELHIVERY_TOKEN) {
+    console.log('Skipping Delhivery: No token found in Vercel env');
+    return null;
+  }
+
+  const addr = order.shippingAddress || {};
+  const fName = addr.firstName || addr.name || '';
+  const lName = addr.lastName || '';
+  const fullName = `${fName} ${lName}`.trim() || 'Customer';
+  const fullAddress = `${addr.address || ''} ${addr.apartment || addr.address2 || ''}`.trim();
+
+  // Delhivery strictly demands this JSON structure
+  const payload = {
+    pickup_location: {
+      name: "Farzan Online Services", // WARNING: Must exactly match the name registered in your Delhivery Dashboard!
+      add: "Farzan Online Service Plot No. 47/B, Survey No. 105/A, Gulshane Masoom", 
+      city: "Malegaon",
+      pin: "423203",
+      country: "India",
+      phone: "9370538787" 
+    },
+    shipments: [
+      {
+        name: fullName,
+        add: fullAddress,
+        pin: addr.pincode || addr.zip || addr.zipcode,
+        city: addr.city,
+        state: addr.state,
+        country: "India",
+        phone: order.phone || addr.phone,
+        order: order.orderId || order._id.toString(),
+        payment_mode: order.paymentMethod === 'cod' ? 'COD' : 'Pre-paid',
+        return_pin: "423203",
+        return_city: "Malegaon",
+        return_phone: "9370538787",
+        return_add: "Farzan Online Service Plot No. 47/B, Survey No. 105/A, Gulshane Masoom",
+        return_state: "Maharashtra",
+        return_country: "India",
+        products_desc: "KidoCart Products",
+        hsn_code: "4820", // Update with your actual GST HSN code
+        cod_amount: order.paymentMethod === 'cod' ? order.total : 0,
+        order_date: new Date(order.createdAt).toISOString().split('T')[0],
+        total_amount: order.total,
+        seller_add: "KidoCart, Malegaon",
+        seller_name: "KidoCart",
+        seller_inv: "INV-" + (order.orderId || '').slice(-6),
+        quantity: order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+      }
+    ]
+  };
+
+  try {
+    // Delhivery's mandatory formatting quirk
+    const bodyString = `format=json&data=${JSON.stringify(payload)}`;
+
+    const response = await fetch(DELHIVERY_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${DELHIVERY_TOKEN}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: bodyString
+    });
+
+    const data = await response.json();
+    
+    // If Delhivery accepts it, they return the Waybill (Tracking Number)
+    if (data.success === true && data.packages && data.packages.length > 0) {
+       console.log('Delhivery Success! AWB:', data.packages[0].waybill);
+       return data.packages[0].waybill; 
+    } else {
+       console.error('Delhivery Rejected Order:', data);
+       return null;
+    }
+  } catch (error) {
+    console.error('Delhivery API Crash:', error);
+    return null;
+  }
+}
+
 // Order Schema
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, unique: true },
