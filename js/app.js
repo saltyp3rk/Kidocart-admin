@@ -7,7 +7,9 @@ if (!localStorage.getItem('admin_token') && !window.location.href.includes('logi
     window.location.href = 'login.html';
 }
 
-const API_BASE = ''; // Blank because frontend and backend are hosted together
+// Deployed admin backend. Absolute URL so the dashboard works both from Live
+// Server (localhost:5500) during dev AND when hosted at admin.kidocart.shop.
+const API_BASE = 'https://admin.kidocart.shop';
 let allProducts = [];
 let allAdminOrders = []; // NEW: Global state for sorting orders
 let cachedImgbbKey = null;
@@ -48,7 +50,8 @@ function initNavigation() {
             if(targetId === 'dashboard-view') loadDashboardData();
             if(targetId === 'products-view') loadProductsData();
             if(targetId === 'customers-view') loadCustomersData();
-            if(targetId === 'orders-view') loadOrdersData(); 
+            if(targetId === 'orders-view') loadOrdersData();
+            if(targetId === 'content-view') loadAppContent();
         });
     });
 }
@@ -101,31 +104,73 @@ async function loadDashboardData() {
 }
 
 // ─── CUSTOMERS ───
+let allCustomers = [];
+
 async function loadCustomersData() {
     const container = document.getElementById('customers-view');
+    container.innerHTML = `
+        <div class="page-header"><h1>Customers</h1></div>
+        <div class="card empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading customers...</p></div>`;
     try {
         const token = localStorage.getItem('admin_token');
         const res = await fetch(`${API_BASE}/api/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        if (!res.ok) throw new Error("Failed");
-        const users = await res.json();
-        
-        container.innerHTML = `
-            <div class="page-header"><h1>Customers</h1></div>
-            <div class="product-grid">
-                ${users.map(u => `
-                    <div class="card">
-                        <div style="font-weight:600">${u.name || 'No Name'}</div>
-                        <div style="font-size:12px; color:var(--text-muted)">${u.email}</div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+        if (!res.ok) throw new Error('Failed');
+        allCustomers = await res.json();
+        renderCustomers(allCustomers);
     } catch (error) {
-        showToast('Error loading customers', 'error');
+        container.innerHTML = `<div class="page-header"><h1>Customers</h1></div><div class="card empty-state">Error loading customers</div>`;
     }
+}
+
+function renderCustomers(users) {
+    const container = document.getElementById('customers-view');
+    const header = `
+        <div class="page-header"><h1>Customers <span style="font-size:14px;color:var(--text-muted);font-weight:500;">(${users.length})</span></h1></div>
+        <div style="margin-bottom:20px;">
+            <input type="text" id="customer-search" placeholder="🔍 Search by name, email or phone..." onkeyup="filterCustomers()" class="form-input">
+        </div>`;
+
+    if (!users.length) {
+        container.innerHTML = header + `<div class="card empty-state"><i class="fas fa-users"></i><p>No customers yet</p></div>`;
+        return;
+    }
+
+    const rows = users.map(u => {
+        const initial = (u.name || u.email || 'K').trim().charAt(0).toUpperCase();
+        const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'}) : '—';
+        const addr = (u.addresses && u.addresses.length) ? u.addresses[u.addresses.length - 1] : null;
+        const city = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '—';
+        const provider = u.authProvider || (u.phone && !u.email ? 'phone' : 'email');
+        return `<tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span class="cell-avatar">${initial}</span>
+                <div><div class="cell-strong">${u.name || 'No Name'}</div><div class="cell-sub">${(u.addresses||[]).length} address(es)</div></div>
+              </div>
+            </td>
+            <td><div style="word-break:break-all;">${u.email || '—'}</div><div class="cell-sub">${u.phone || '—'}</div></td>
+            <td>${city}</td>
+            <td><span class="badge-pill pv-${provider}" style="text-transform:capitalize;">${provider}</span></td>
+            <td>${joined}</td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = header + `
+        <div class="table-wrap"><div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Customer</th><th>Contact</th><th>Location</th><th>Signup</th><th>Joined</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div></div>`;
+}
+
+function filterCustomers() {
+    const q = document.getElementById('customer-search').value.toLowerCase();
+    renderCustomers(allCustomers.filter(u =>
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.phone || '').includes(q)
+    ));
 }
 
 // ─── ORDERS (UPGRADED UI & LOGIC) ───
@@ -150,85 +195,59 @@ async function loadOrdersData() {
     }
 }
 
-// Render the orders with the dynamic sorting buttons
+const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+function statusClass(s) { return 'st-' + (s || 'pending'); }
+
+// Render orders as a structured table with colour-coded status dropdowns
 window.renderOrdersList = function(filterStatus = 'all') {
     const container = document.getElementById('orders-view');
-
-    // Filter logic
-    const filteredOrders = filterStatus === 'all' 
-        ? allAdminOrders 
+    const filtered = filterStatus === 'all'
+        ? allAdminOrders
         : allAdminOrders.filter(o => o.status === filterStatus);
 
-    // Build the Sorting Header
+    const tabs = ['all', ...ORDER_STATUSES];
     const filterHTML = `
-        <div class="page-header"><h1>Orders</h1></div>
-        <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
-            <button class="btn-secondary" onclick="renderOrdersList('all')" style="${filterStatus === 'all' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">All</button>
-            <button class="btn-secondary" onclick="renderOrdersList('pending')" style="${filterStatus === 'pending' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Pending</button>
-            <button class="btn-secondary" onclick="renderOrdersList('processing')" style="${filterStatus === 'processing' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Processing</button>
-            <button class="btn-secondary" onclick="renderOrdersList('shipped')" style="${filterStatus === 'shipped' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Shipped</button>
-            <button class="btn-secondary" onclick="renderOrdersList('delivered')" style="${filterStatus === 'delivered' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Delivered</button>
-            <button class="btn-secondary" onclick="renderOrdersList('cancelled')" style="${filterStatus === 'cancelled' ? 'background: black; color: white;' : 'border-radius: 20px;'} padding: 6px 16px; border-radius: 20px;">Cancelled</button>
-        </div>
-    `;
+        <div class="page-header"><h1>Orders <span style="font-size:14px;color:var(--text-muted);font-weight:500;">(${allAdminOrders.length})</span></h1></div>
+        <div class="filter-tabs">
+            ${tabs.map(t => `<button class="filter-tab ${filterStatus === t ? 'active' : ''}" onclick="renderOrdersList('${t}')">${t}</button>`).join('')}
+        </div>`;
 
-    if (filteredOrders.length === 0) {
+    if (!filtered.length) {
         container.innerHTML = filterHTML + `<div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found for this status</p></div>`;
         return;
     }
 
-    const ordersHtml = filteredOrders.map(o => {
-        // Time Parsing
-        const dateObj = new Date(o.createdAt);
-        const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-        const timeStr = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-        // Name Formatting (Handles both old split names and new combined names)
-        const custName = (o.shippingAddress && o.shippingAddress.name) 
-            ? o.shippingAddress.name 
-            : (o.shippingAddress && o.shippingAddress.firstName ? `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}` : 'Guest Customer');
+    const rows = filtered.map(o => {
+        const d = new Date(o.createdAt);
+        const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const custName = (o.shippingAddress && o.shippingAddress.name)
+            ? o.shippingAddress.name
+            : (o.shippingAddress && o.shippingAddress.firstName ? `${o.shippingAddress.firstName} ${o.shippingAddress.lastName || ''}` : 'Guest');
         const phone = (o.shippingAddress && o.shippingAddress.phone) ? o.shippingAddress.phone : 'N/A';
-
-        // Transaction Badge
-        const txBadge = o.paymentMethod === 'razorpay' 
-            ? `<span style="background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">Txn: ${o.transactionId || o.paymentId || 'Online'}</span>`
-            : `<span style="background: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">COD</span>`;
-
-        // Horizontal Status Pills
-        const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-        let statusButtons = `<div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid #e5e5e5; padding-top: 16px; overflow-x: auto;">`;
-        statuses.forEach(s => {
-            let isActive = o.status === s 
-                ? 'background: black; color: white; border: 1px solid var(--accent);' 
-                : 'background: white; border: 1px solid #d4d4d4; color: #737373;';
-            statusButtons += `<button onclick="updateOrderStatus('${o.orderId || o._id}', '${s}')" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; transition: 0.2s; white-space: nowrap; ${isActive}">${s}</button>`;
-        });
-        statusButtons += `</div>`;
-
-        return `
-            <div class="card" style="margin-bottom: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">Order #${(o.orderId || '').replace('ORD-', '')}</h3>
-                        <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--gray-500);">${dateStr} at ${timeStr}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <h3 style="margin: 0; font-size: 16px; color: var(--black);">₹${(o.total || 0).toLocaleString('en-IN')}</h3>
-                        <div style="margin-top: 6px;">${txBadge}</div>
-                    </div>
-                </div>
-                
-                <div style="font-size: 14px; color: var(--gray-700); line-height: 1.6;">
-                    <strong>Customer:</strong> ${custName} <br>
-                    <strong>Phone:</strong> ${phone} <br>
-                    <strong>Items:</strong> ${o.items ? o.items.length : 0} items
-                </div>
-                ${statusButtons}
-            </div>
-        `;
+        const pay = o.paymentMethod === 'razorpay'
+            ? `<span class="badge-pill pv-email" style="text-transform:none;">Online</span>`
+            : `<span class="badge-pill" style="background:#f3f4f6;color:#374151;text-transform:none;">COD</span>`;
+        const oid = o.orderId || o._id;
+        const shortId = (o.orderId || '').replace('ORD-', '').slice(-8) || String(oid).slice(-8);
+        const sel = `<select class="status-select ${statusClass(o.status)}" onchange="updateOrderStatus('${oid}', this.value)">
+            ${ORDER_STATUSES.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>`;
+        return `<tr>
+            <td><div class="cell-strong">#${shortId}</div><div class="cell-sub">${o.items ? o.items.length : 0} item(s)</div></td>
+            <td>${dateStr}<div class="cell-sub">${timeStr}</div></td>
+            <td><div class="cell-strong">${custName}</div><div class="cell-sub">${phone}</div></td>
+            <td class="cell-strong">₹${(o.total || 0).toLocaleString('en-IN')}</td>
+            <td>${pay}</td>
+            <td>${sel}</td>
+        </tr>`;
     }).join('');
 
-    container.innerHTML = filterHTML + `<div id="orders-list-container">${ordersHtml}</div>`;
+    container.innerHTML = filterHTML + `
+        <div class="table-wrap"><div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div></div>`;
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -299,7 +318,8 @@ function renderProducts(products) {
                     </div>
                 </div>
                 <div class="product-actions">
-                    <button class="icon-btn" style="color: var(--primary);" onclick="openEditModal('${pId}')"><i class="fas fa-edit"></i></button>
+                    <button class="icon-btn" style="color: var(--primary);" onclick="openEditModal('${pId}')" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="icon-btn" style="color: var(--danger, #EF4444);" onclick="deleteProduct('${pId}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Delete"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         `;
@@ -308,11 +328,27 @@ function renderProducts(products) {
 
 function filterProducts() {
     const search = document.getElementById('product-search').value.toLowerCase();
-    const filtered = allProducts.filter(p => 
-        p.name.toLowerCase().includes(search) || 
+    const filtered = allProducts.filter(p =>
+        p.name.toLowerCase().includes(search) ||
         (p.brand && p.brand.toLowerCase().includes(search))
     );
     renderProducts(filtered);
+}
+
+async function deleteProduct(productId, name) {
+    if (!confirm(`Delete "${name || 'this product'}"? This removes it from the store permanently and cannot be undone.`)) return;
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/products?id=${productId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to delete product');
+        showToast('Product deleted');
+        loadProductsData();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }
 
 // ─── MODAL & IMGBB LOGIC ───
@@ -425,3 +461,93 @@ document.getElementById('product-form').addEventListener('submit', async functio
         submitBtn.disabled = false;
     }
 });
+
+// ══════════════════════════════════════════════════════════
+// APP CONTENT — announcement/marquee + flash sale (drives the mobile app)
+// ══════════════════════════════════════════════════════════
+const APPCONFIG_URL = `${API_BASE}/api/appconfig`;
+let appConfig = null;
+
+function toLocalInput(iso) {
+    const d = new Date(iso);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+}
+
+async function loadAppContent() {
+    try {
+        const res = await fetch(APPCONFIG_URL);
+        appConfig = res.ok ? await res.json() : {};
+    } catch { appConfig = {}; }
+
+    // Announcement
+    const ann = appConfig.announcement || {};
+    const enabledEl = document.getElementById('ann-enabled');
+    if (enabledEl) enabledEl.checked = ann.enabled !== false;
+    const msgs = (ann.messages && ann.messages.length)
+        ? ann.messages
+        : ['Free Shipping over ₹499', 'Flash Sale — Live Now', 'Buy 2 Get 1 Free'];
+    renderMessageRows(msgs);
+    updateAnnPreview();
+
+    // Flash sale
+    const fs = appConfig.flashSale || {};
+    if (document.getElementById('fs-enabled')) {
+        document.getElementById('fs-enabled').checked = !!fs.enabled;
+        document.getElementById('fs-title').value = fs.title || 'Flash Sale';
+        document.getElementById('fs-subtitle').value = fs.subtitle || 'Ends in — grab them fast!';
+        document.getElementById('fs-end').value = fs.endTime ? toLocalInput(fs.endTime) : '';
+    }
+}
+
+function renderMessageRows(msgs) {
+    document.getElementById('ann-messages').innerHTML = msgs.map(m => messageRowHTML(m)).join('');
+}
+function messageRowHTML(val = '') {
+    const safe = (val || '').replace(/"/g, '&quot;');
+    return `<div class="ann-msg-row">
+        <input class="form-input" value="${safe}" oninput="updateAnnPreview()" placeholder="e.g. Free Shipping over ₹499">
+        <button class="del" onclick="this.parentElement.remove(); updateAnnPreview()" title="Remove"><i class="fas fa-trash"></i></button>
+    </div>`;
+}
+function addMessageRow() {
+    document.getElementById('ann-messages').insertAdjacentHTML('beforeend', messageRowHTML(''));
+}
+function getMessages() {
+    return [...document.querySelectorAll('#ann-messages input')].map(i => i.value.trim()).filter(Boolean);
+}
+function updateAnnPreview() {
+    const msgs = getMessages();
+    const seq = msgs.length ? msgs : ['Your announcement preview'];
+    document.getElementById('ann-preview-track').innerHTML = [...seq, ...seq].map(m => `<span>${m}</span>`).join('');
+}
+
+async function saveAppContent() {
+    const body = {
+        announcement: {
+            enabled: document.getElementById('ann-enabled').checked,
+            messages: getMessages(),
+        },
+    };
+    if (document.getElementById('fs-enabled')) {
+        const endVal = document.getElementById('fs-end').value;
+        body.flashSale = {
+            enabled: document.getElementById('fs-enabled').checked,
+            title: document.getElementById('fs-title').value.trim() || 'Flash Sale',
+            subtitle: document.getElementById('fs-subtitle').value.trim(),
+            endTime: endVal ? new Date(endVal).toISOString() : null,
+        };
+    }
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(APPCONFIG_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        showToast('Published to the app');
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}

@@ -34,6 +34,7 @@
         <a href="#" class="nav-item" data-target="customers-view"><i class="fas fa-users"></i> Customers</a>
         <!-- NEW PROMO TAB -->
         <a href="#" class="nav-item" data-target="promo-view"><i class="fas fa-tags"></i> Promos</a>
+        <a href="#" class="nav-item" data-target="content-view"><i class="fas fa-bullhorn"></i> App Content</a>
       </nav>
     </aside>
 
@@ -140,6 +141,56 @@
           <div id="promo-list-container" style="overflow-x: auto;">
             <p style="color: var(--text-muted, #737373);"><i class="fas fa-spinner fa-spin"></i> Loading codes...</p>
           </div>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- APP CONTENT (Announcement / Marquee control for mobile) -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <section id="content-view" class="view-section">
+        <div class="page-header">
+          <h1>App Content</h1>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
+            <div>
+              <h3 style="margin:0; font-size:16px;"><i class="fas fa-bullhorn" style="color:var(--accent); margin-right:6px;"></i> Announcement Bar</h3>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">The scrolling messages shown at the top of the mobile app home screen.</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="ann-enabled" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <!-- Live preview -->
+          <div id="ann-preview" class="ann-preview"><div id="ann-preview-track" class="ann-preview-track"></div></div>
+
+          <label class="form-label" style="margin-top:16px;">Messages</label>
+          <div id="ann-messages"></div>
+          <button class="btn-secondary" onclick="addMessageRow()" style="margin-top:6px;"><i class="fas fa-plus"></i> Add message</button>
+
+          <div style="margin-top:20px; display:flex; gap:10px;">
+            <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-save"></i> Save & Publish</button>
+            <button class="btn-secondary" onclick="loadAppContent()" style="border-radius:10px;"><i class="fas fa-rotate"></i> Reset</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
+            <div>
+              <h3 style="margin:0; font-size:16px;"><i class="fas fa-bolt" style="color:var(--accent); margin-right:6px;"></i> Flash Sale Timer</h3>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">Countdown banner on the app home. The phone counts down to the end time you set.</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="fs-enabled"><span class="switch-track"></span></label>
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <div class="form-group"><label class="form-label">Title</label><input type="text" id="fs-title" class="form-input" placeholder="Flash Sale"></div>
+            <div class="form-group"><label class="form-label">Subtitle</label><input type="text" id="fs-subtitle" class="form-input" placeholder="Ends in — grab them fast!"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Ends at</label><input type="datetime-local" id="fs-end" class="form-input"></div>
+          <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-save"></i> Save &amp; Publish</button>
         </div>
       </section>
 
