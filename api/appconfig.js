@@ -25,8 +25,18 @@ const appConfigSchema = new mongoose.Schema({
     subtitle: { type: String, default: '' },
     endTime: { type: Date, default: null },
   },
+  carousel: {
+    type: [{
+      image: String,       // banner image URL (ImgBB)
+      title: String,
+      subtitle: String,
+      category: String,    // optional: tap → product list filtered by this
+      enabled: { type: Boolean, default: true },
+    }],
+    default: [],
+  },
   updatedAt: { type: Date, default: Date.now },
-}, { strict: false }); // strict:false so we can add carousel later
+}, { strict: false });
 
 const AppConfig = mongoose.models.AppConfig || mongoose.model('AppConfig', appConfigSchema);
 
@@ -67,7 +77,9 @@ module.exports = async (req, res) => {
     if (req.method === 'GET') {
       let cfg = await AppConfig.findOne({ key: 'main' }).lean();
       if (!cfg) cfg = DEFAULTS; // never 404 — always return usable content
-      return res.status(200).json(cfg);
+      // serverTime lets the app anchor the flash-sale countdown to the server
+      // clock (device-clock tampering can't extend/shorten the sale).
+      return res.status(200).json({ ...cfg, serverTime: new Date().toISOString() });
     }
 
     // WRITE — admin only
@@ -91,6 +103,17 @@ module.exports = async (req, res) => {
           subtitle: (flashSale.subtitle || '').toString().trim(),
           endTime: flashSale.endTime ? new Date(flashSale.endTime) : null,
         };
+      }
+      if (Array.isArray(req.body.carousel)) {
+        update.carousel = req.body.carousel
+          .filter(b => b && b.image)
+          .map(b => ({
+            image: String(b.image),
+            title: (b.title || '').toString().trim(),
+            subtitle: (b.subtitle || '').toString().trim(),
+            category: (b.category || '').toString().trim(),
+            enabled: b.enabled !== false,
+          }));
       }
 
       const cfg = await AppConfig.findOneAndUpdate(

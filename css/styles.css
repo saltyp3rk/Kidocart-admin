@@ -66,6 +66,14 @@ body {
   box-shadow: 0 6px 16px rgba(255,107,53,0.28);
 }
 .side-nav .nav-item.active:hover { color: #fff; background: var(--primary); }
+.sidebar-logout {
+  margin: auto 12px 20px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+  background: rgba(239,68,68,0.08); color: var(--danger); border: 1px solid rgba(239,68,68,0.18);
+  border-radius: 10px; font-weight: 600; font-size: 14.5px; font-family: inherit; cursor: pointer;
+  transition: background .15s ease;
+}
+.sidebar-logout:hover { background: rgba(239,68,68,0.14); }
+.sidebar-logout i { width: 18px; text-align: center; }
 
 /* ─── MOBILE HEADER & NAV ─── */
 .app-header {
@@ -247,6 +255,10 @@ body {
 .ann-msg-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .ann-msg-row .form-input { margin: 0; }
 .ann-msg-row .del { color: var(--danger); background: none; border: none; cursor: pointer; font-size: 15px; width: 34px; }
+.banner-row { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; background: rgba(255,255,255,0.5); }
+.banner-thumb { width: 96px; height: 64px; border-radius: 10px; background: #f1f3f6 center/cover no-repeat; border: 1.5px dashed #d8dce2; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; flex-shrink: 0; overflow: hidden; }
+.banner-thumb i { font-size: 18px; }
+.banner-row .del { color: var(--danger); background: none; border: none; cursor: pointer; font-size: 15px; }
 
 /* ══════════════════════════════════════════════════════════
    DATA TABLES (Orders / Customers / Promos)
@@ -288,7 +300,9 @@ body {
 .pv-email  { background: #e0e7ff; color: #4338ca; }
 
 /* Inline status <select> that looks like a colored badge */
-.status-select { border: none; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; outline: none; font-family: inherit; -webkit-appearance: none; appearance: none; padding-right: 26px; background-repeat: no-repeat; background-position: right 8px center; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+.status-select { border: none; border-radius: 20px; padding: 6px 30px 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize; outline: none; font-family: inherit; -webkit-appearance: none; appearance: none; background-repeat: no-repeat; background-position: right 9px center; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+/* The open dropdown list stays clean white/readable (options don't inherit the badge colour) */
+.status-select option { background: #ffffff; color: #1f2937; font-weight: 500; text-transform: capitalize; }
 
 /* Filter tab pills */
 .filter-tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }

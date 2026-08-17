@@ -36,6 +36,7 @@
         <a href="#" class="nav-item" data-target="promo-view"><i class="fas fa-tags"></i> Promos</a>
         <a href="#" class="nav-item" data-target="content-view"><i class="fas fa-bullhorn"></i> App Content</a>
       </nav>
+      <button class="sidebar-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Log Out</button>
     </aside>
 
     <main class="main-content">
@@ -191,6 +192,18 @@
           </div>
           <div class="form-group"><label class="form-label">Ends at</label><input type="datetime-local" id="fs-end" class="form-input"></div>
           <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-save"></i> Save &amp; Publish</button>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+            <div>
+              <h3 style="margin:0; font-size:16px;"><i class="fas fa-images" style="color:var(--accent); margin-right:6px;"></i> Home Carousel</h3>
+              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">Promo banners shown at the top of the app home. Upload an image, add a title &amp; optional category to open on tap.</p>
+            </div>
+            <button class="btn-secondary" onclick="addCarouselBanner()"><i class="fas fa-plus"></i> Add banner</button>
+          </div>
+          <div id="carousel-list"></div>
+          <button class="btn btn-primary" onclick="saveAppContent()" style="margin-top:6px;"><i class="fas fa-save"></i> Save &amp; Publish</button>
         </div>
       </section>
 

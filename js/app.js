@@ -189,7 +189,7 @@ async function loadOrdersData() {
 
         if (!res.ok) throw new Error("Failed to load orders");
         allAdminOrders = await res.json();
-        renderOrdersList('all');
+        renderOrdersList(); // keeps the current filter/search
     } catch (error) {
         list.innerHTML = `<div class="page-header"><h1>Orders</h1></div><div class="card empty-state">Error loading orders</div>`;
     }
@@ -197,57 +197,81 @@ async function loadOrdersData() {
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 function statusClass(s) { return 'st-' + (s || 'pending'); }
+let currentOrderFilter = 'all';
+let orderSearch = '';
 
-// Render orders as a structured table with colour-coded status dropdowns
-window.renderOrdersList = function(filterStatus = 'all') {
-    const container = document.getElementById('orders-view');
-    const filtered = filterStatus === 'all'
-        ? allAdminOrders
-        : allAdminOrders.filter(o => o.status === filterStatus);
+function orderCustName(o) {
+    if (o.shippingAddress && o.shippingAddress.name) return o.shippingAddress.name;
+    if (o.shippingAddress && o.shippingAddress.firstName) return `${o.shippingAddress.firstName} ${o.shippingAddress.lastName || ''}`;
+    return 'Guest';
+}
 
-    const tabs = ['all', ...ORDER_STATUSES];
-    const filterHTML = `
-        <div class="page-header"><h1>Orders <span style="font-size:14px;color:var(--text-muted);font-weight:500;">(${allAdminOrders.length})</span></h1></div>
-        <div class="filter-tabs">
-            ${tabs.map(t => `<button class="filter-tab ${filterStatus === t ? 'active' : ''}" onclick="renderOrdersList('${t}')">${t}</button>`).join('')}
-        </div>`;
+function orderRowHTML(o) {
+    const d = new Date(o.createdAt);
+    const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const phone = (o.shippingAddress && o.shippingAddress.phone) ? o.shippingAddress.phone : 'N/A';
+    const pay = o.paymentMethod === 'razorpay'
+        ? `<span class="badge-pill pv-email" style="text-transform:none;">Online</span>`
+        : `<span class="badge-pill" style="background:#f3f4f6;color:#374151;text-transform:none;">COD</span>`;
+    const oid = o.orderId || o._id;
+    const shortId = (o.orderId || '').replace('ORD-', '').slice(-8) || String(oid).slice(-8);
+    const sel = `<select class="status-select ${statusClass(o.status)}" onchange="updateOrderStatus('${oid}', this.value)">
+        ${ORDER_STATUSES.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+    </select>`;
+    return `<tr>
+        <td><div class="cell-strong">#${shortId}</div><div class="cell-sub">${o.items ? o.items.length : 0} item(s)</div></td>
+        <td>${dateStr}<div class="cell-sub">${timeStr}</div></td>
+        <td><div class="cell-strong">${orderCustName(o)}</div><div class="cell-sub">${phone}</div></td>
+        <td class="cell-strong">₹${(o.total || 0).toLocaleString('en-IN')}</td>
+        <td>${pay}</td>
+        <td>${sel}</td>
+    </tr>`;
+}
 
-    if (!filtered.length) {
-        container.innerHTML = filterHTML + `<div class="card empty-state"><i class="fas fa-receipt"></i><p>No orders found for this status</p></div>`;
-        return;
+function getFilteredOrders() {
+    let list = currentOrderFilter === 'all' ? allAdminOrders : allAdminOrders.filter(o => o.status === currentOrderFilter);
+    const q = orderSearch.trim().toLowerCase();
+    if (q) {
+        list = list.filter(o => {
+            const phone = (o.shippingAddress && o.shippingAddress.phone) || '';
+            const id = String(o.orderId || o._id || '');
+            return orderCustName(o).toLowerCase().includes(q) || phone.includes(q) || id.toLowerCase().includes(q);
+        });
     }
+    return list;
+}
 
-    const rows = filtered.map(o => {
-        const d = new Date(o.createdAt);
-        const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-        const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-        const custName = (o.shippingAddress && o.shippingAddress.name)
-            ? o.shippingAddress.name
-            : (o.shippingAddress && o.shippingAddress.firstName ? `${o.shippingAddress.firstName} ${o.shippingAddress.lastName || ''}` : 'Guest');
-        const phone = (o.shippingAddress && o.shippingAddress.phone) ? o.shippingAddress.phone : 'N/A';
-        const pay = o.paymentMethod === 'razorpay'
-            ? `<span class="badge-pill pv-email" style="text-transform:none;">Online</span>`
-            : `<span class="badge-pill" style="background:#f3f4f6;color:#374151;text-transform:none;">COD</span>`;
-        const oid = o.orderId || o._id;
-        const shortId = (o.orderId || '').replace('ORD-', '').slice(-8) || String(oid).slice(-8);
-        const sel = `<select class="status-select ${statusClass(o.status)}" onchange="updateOrderStatus('${oid}', this.value)">
-            ${ORDER_STATUSES.map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>`;
-        return `<tr>
-            <td><div class="cell-strong">#${shortId}</div><div class="cell-sub">${o.items ? o.items.length : 0} item(s)</div></td>
-            <td>${dateStr}<div class="cell-sub">${timeStr}</div></td>
-            <td><div class="cell-strong">${custName}</div><div class="cell-sub">${phone}</div></td>
-            <td class="cell-strong">₹${(o.total || 0).toLocaleString('en-IN')}</td>
-            <td>${pay}</td>
-            <td>${sel}</td>
-        </tr>`;
-    }).join('');
+// Only re-renders the <tbody> so the search box keeps focus while typing.
+function applyOrderRows() {
+    const input = document.getElementById('order-search');
+    if (input) orderSearch = input.value;
+    const tbody = document.getElementById('orders-tbody');
+    if (!tbody) return;
+    const list = getFilteredOrders();
+    tbody.innerHTML = list.length
+        ? list.map(orderRowHTML).join('')
+        : `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-receipt"></i>&nbsp; No orders match</td></tr>`;
+}
 
-    container.innerHTML = filterHTML + `
+// Full render (header + search + status tabs + table shell)
+window.renderOrdersList = function(filterStatus) {
+    if (filterStatus !== undefined) currentOrderFilter = filterStatus;
+    const container = document.getElementById('orders-view');
+    const tabs = ['all', ...ORDER_STATUSES];
+    container.innerHTML = `
+        <div class="page-header"><h1>Orders <span style="font-size:14px;color:var(--text-muted);font-weight:500;">(${allAdminOrders.length})</span></h1></div>
+        <div style="margin-bottom:16px;">
+            <input id="order-search" class="form-input" placeholder="🔍 Search by order #, customer or phone..." value="${orderSearch.replace(/"/g, '&quot;')}" onkeyup="applyOrderRows()">
+        </div>
+        <div class="filter-tabs">
+            ${tabs.map(t => `<button class="filter-tab ${currentOrderFilter === t ? 'active' : ''}" onclick="renderOrdersList('${t}')">${t}</button>`).join('')}
+        </div>
         <div class="table-wrap"><div class="table-scroll"><table class="data-table">
             <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody id="orders-tbody"></tbody>
         </table></div></div>`;
+    applyOrderRows();
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -498,6 +522,61 @@ async function loadAppContent() {
         document.getElementById('fs-subtitle').value = fs.subtitle || 'Ends in — grab them fast!';
         document.getElementById('fs-end').value = fs.endTime ? toLocalInput(fs.endTime) : '';
     }
+
+    // Carousel
+    carouselBanners = Array.isArray(appConfig.carousel) ? appConfig.carousel.map(b => ({...b})) : [];
+    renderCarousel();
+}
+
+// ─── Carousel banners ───
+let carouselBanners = [];
+const BANNER_CATEGORIES = ['', 'clothing', 'toys', 'feeding', 'diapers', 'furniture', 'gear', 'bath', 'books'];
+
+function renderCarousel() {
+    const wrap = document.getElementById('carousel-list');
+    if (!wrap) return;
+    if (!carouselBanners.length) {
+        wrap.innerHTML = `<div class="empty-state" style="padding:24px;"><i class="fas fa-image"></i><p>No banners yet — add one.</p></div>`;
+        return;
+    }
+    wrap.innerHTML = carouselBanners.map((b, i) => `
+        <div class="banner-row">
+            <label class="banner-thumb" style="${b.image ? `background-image:url('${b.image}')` : ''}">
+                ${b.image ? '' : '<i class="fas fa-upload"></i>'}
+                <input type="file" accept="image/*" onchange="uploadBannerImage(${i}, this)" style="display:none;">
+            </label>
+            <div style="flex:1; min-width:0;">
+                <input class="form-input" style="margin-bottom:8px;" placeholder="Title (e.g. New Season Arrivals)" value="${(b.title||'').replace(/"/g,'&quot;')}" oninput="carouselBanners[${i}].title=this.value">
+                <input class="form-input" style="margin-bottom:8px;" placeholder="Subtitle" value="${(b.subtitle||'').replace(/"/g,'&quot;')}" oninput="carouselBanners[${i}].subtitle=this.value">
+                <select class="form-input" onchange="carouselBanners[${i}].category=this.value">
+                    ${BANNER_CATEGORIES.map(c => `<option value="${c}" ${b.category===c?'selected':''}>${c ? 'Opens: '+c : 'No link'}</option>`).join('')}
+                </select>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+                <label class="switch"><input type="checkbox" ${b.enabled!==false?'checked':''} onchange="carouselBanners[${i}].enabled=this.checked"><span class="switch-track"></span></label>
+                <button class="del" onclick="removeCarouselBanner(${i})" title="Remove"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+function addCarouselBanner() {
+    carouselBanners.push({image: '', title: '', subtitle: '', category: '', enabled: true});
+    renderCarousel();
+}
+function removeCarouselBanner(i) {
+    carouselBanners.splice(i, 1);
+    renderCarousel();
+}
+async function uploadBannerImage(i, input) {
+    if (!input.files || !input.files[0]) return;
+    showToast('Uploading image...');
+    try {
+        const url = await uploadToImgBB(input.files[0]);
+        carouselBanners[i].image = url;
+        renderCarousel();
+    } catch (e) {
+        showToast('Image upload failed', 'error');
+    }
 }
 
 function renderMessageRows(msgs) {
@@ -538,6 +617,7 @@ async function saveAppContent() {
             endTime: endVal ? new Date(endVal).toISOString() : null,
         };
     }
+    body.carousel = carouselBanners.filter(b => b.image);
     try {
         const token = localStorage.getItem('admin_token');
         const res = await fetch(APPCONFIG_URL, {
