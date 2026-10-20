@@ -4,16 +4,25 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 
 // ─── FIREBASE ADMIN INITIALIZATION ───
-if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
+if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
-      })
-    });
-    console.log('Firebase Admin Initialized');
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+      const creds = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      admin.initializeApp({ credential: admin.credential.cert(creds) });
+      console.log('Firebase Admin Initialized with FIREBASE_SERVICE_ACCOUNT');
+    } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+        })
+      });
+      console.log('Firebase Admin Initialized with PROJECT_ID');
+    } else {
+      admin.initializeApp();
+    }
   } catch (error) {
     console.error('Firebase Admin Init Error:', error);
   }
@@ -204,6 +213,105 @@ async function sendFirebaseMessage(phone, status, orderId) {
   }
 }
 
+// ─── DEVICE TOKEN & NOTIFICATION MODELS ───
+const deviceTokenSchema = new mongoose.Schema({
+  token: { type: String, required: true, unique: true },
+  userId: { type: String, sparse: true, default: null },
+  platform: { type: String, default: 'android' },
+  updatedAt: { type: Date, default: Date.now },
+});
+const DeviceToken = mongoose.models.DeviceToken || mongoose.model('DeviceToken', deviceTokenSchema);
+
+const notificationSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  body: { type: String, required: true },
+  type: { type: String, default: 'order' },
+  read: { type: Boolean, default: false },
+  data: { type: Object, default: {} },
+  createdAt: { type: Date, default: Date.now },
+});
+const Notification = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
+
+async function sendFcmOrderNotification(order, status) {
+  const shortId = (order.orderId || order._id.toString()).slice(-6);
+  const statusUpper = String(status || order.status || '').toUpperCase();
+  let title = `Order Update: #${shortId}`;
+  let body = `Your order #${shortId} status has been updated to ${statusUpper}.`;
+
+  if (status === 'shipped') {
+    title = `Order Shipped! #${shortId}`;
+    body = `Great news! Your KidoCart order #${shortId} is on the way.`;
+  } else if (status === 'delivered') {
+    title = `Order Delivered! #${shortId}`;
+    body = `Your KidoCart order #${shortId} has been delivered. Enjoy!`;
+  } else if (status === 'cancelled') {
+    title = `Order Cancelled #${shortId}`;
+    body = `Your order #${shortId} has been cancelled.`;
+  } else if (status === 'processing') {
+    title = `Order Processing #${shortId}`;
+    body = `We're preparing your order #${shortId} for dispatch.`;
+  } else if (status === 'confirmed') {
+    title = `Order Confirmed! #${shortId}`;
+    body = `Thank you! Your order #${shortId} has been confirmed.`;
+  }
+
+  // 1. Save in-app notification in DB
+  try {
+    const notif = new Notification({
+      userId: order.userId || 'all',
+      title,
+      body,
+      type: 'order',
+      data: { orderId: String(order._id), status: String(status) },
+    });
+    await notif.save();
+    console.log('[PUSH] In-app notification saved for user:', order.userId);
+  } catch (err) {
+    console.warn('[PUSH] Failed to save in-app notification:', err.message);
+  }
+
+  // 2. Query FCM device tokens
+  let tokens = [];
+  try {
+    if (order.userId) {
+      const userTokens = await DeviceToken.find({ userId: order.userId }).lean();
+      tokens = userTokens.map(t => t.token).filter(Boolean);
+    }
+    if (!tokens.length) {
+      const recentTokens = await DeviceToken.find().sort({ updatedAt: -1 }).limit(10).lean();
+      tokens = recentTokens.map(t => t.token).filter(Boolean);
+    }
+  } catch (err) {
+    console.error('[PUSH] Failed to fetch device tokens:', err.message);
+  }
+
+  if (!tokens.length) {
+    console.log('[PUSH] No FCM device tokens found in database');
+    return;
+  }
+
+  // 3. Dispatch multicast via Firebase Admin
+  if (admin.apps.length > 0 && admin.messaging) {
+    try {
+      const resp = await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: { title, body },
+        data: {
+          orderId: String(order._id),
+          type: 'order',
+          status: String(status),
+        },
+      });
+      console.log(`[PUSH] FCM sent successfully to ${resp.successCount} devices (${resp.failureCount} failed)`);
+    } catch (fcmErr) {
+      console.error('[PUSH] FCM multicast error:', fcmErr.message);
+    }
+  } else {
+    console.log('[PUSH] Firebase Admin messaging not initialized');
+  }
+}
+
 // ─── MAIN EXPORT ───
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -302,6 +410,11 @@ module.exports = async (req, res) => {
       if (order.status && order.shippingAddress && order.shippingAddress.phone) {
         sendFirebaseMessage(order.shippingAddress.phone, order.status, order.orderId);
       }
+
+      // Dispatch push notification to customer's mobile app via FCM
+      await sendFcmOrderNotification(order, order.status).catch(err => {
+        console.error('[PUSH-TRIGGER-ERROR]:', err.message);
+      });
 
       return res.status(200).json(order);
     }
