@@ -52,6 +52,7 @@ function initNavigation() {
             if(targetId === 'customers-view') loadCustomersData();
             if(targetId === 'orders-view') loadOrdersData();
             if(targetId === 'content-view') loadAppContent();
+            if(targetId === 'notifications-view') loadNotificationStats();
         });
     });
 }
@@ -631,3 +632,82 @@ async function saveAppContent() {
         showToast(e.message, 'error');
     }
 }
+
+// ─── PUSH NOTIFICATIONS ───
+async function loadNotificationStats() {
+    const el = document.getElementById('notif-device-count');
+    if (!el) return;
+    el.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size: 20px;"></i>';
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/notifications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load notification stats');
+        const data = await res.json();
+        el.textContent = data.registeredDevices || 0;
+    } catch (e) {
+        el.textContent = '0';
+        console.warn('Notification stats error:', e.message);
+    }
+}
+
+async function handleSendPushNotification(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-send-notif');
+    const statusBox = document.getElementById('notif-status-box');
+    const title = document.getElementById('notif-title').value.trim();
+    const body = document.getElementById('notif-body').value.trim();
+    const type = document.getElementById('notif-type').value;
+    const url = document.getElementById('notif-url').value.trim();
+
+    if (!title || !body) {
+        showToast('Please enter both title and body', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    statusBox.style.display = 'none';
+
+    try {
+        const token = localStorage.getItem('admin_token');
+        const res = await fetch(`${API_BASE}/api/notifications?action=send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                title,
+                body,
+                type,
+                data: { url }
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to send notification');
+
+        showToast('Notification sent successfully!');
+        statusBox.style.display = 'block';
+        statusBox.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+        statusBox.style.color = '#10B981';
+        statusBox.style.border = '1px solid #10B981';
+        statusBox.innerHTML = `<strong>Result:</strong> ${data.status} (Total devices in database: ${data.totalTokens || data.registeredDevices || 0})`;
+
+        document.getElementById('push-notification-form').reset();
+        loadNotificationStats();
+    } catch (err) {
+        showToast(err.message, 'error');
+        statusBox.style.display = 'block';
+        statusBox.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+        statusBox.style.color = '#EF4444';
+        statusBox.style.border = '1px solid #EF4444';
+        statusBox.innerHTML = `<strong>Error:</strong> ${err.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Push Notification';
+    }
+}
+

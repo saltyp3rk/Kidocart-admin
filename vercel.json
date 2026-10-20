@@ -17,7 +17,8 @@
     { "source": "/api/orders", "destination": "/api/orders/index.js" },
     { "source": "/api/orders/:id", "destination": "/api/orders/[id].js" },
     { "source": "/api/users", "destination": "/api/users/index.js" },
-    { "source": "/api/dashboard/stats", "destination": "/api/dashboard/stats.js" }
+    { "source": "/api/dashboard/stats", "destination": "/api/dashboard/stats.js" },
+    { "source": "/api/notifications", "destination": "/api/notifications.js" }
   ],
   "headers": [
     {
