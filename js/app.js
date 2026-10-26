@@ -1117,8 +1117,24 @@ function renderCustomers(users) {
   const rows = users.map(u => {
     const uId = u._id || u.userId || u.id;
     const initial = (u.name || u.email || 'K').trim().charAt(0).toUpperCase();
-    const d = new Date(u.createdAt);
-    const joined = isNaN(d) ? '—' : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    let d = u.createdAt ? new Date(u.createdAt) : null;
+    if (!d || isNaN(d.getTime())) {
+      const idStr = String(u._id || '');
+      if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+        const sec = parseInt(idStr.substring(0, 8), 16);
+        if (!isNaN(sec) && sec > 1500000000) d = new Date(sec * 1000);
+      }
+      if ((!d || isNaN(d.getTime())) && u.userId) {
+        const match = String(u.userId).match(/^user-(\d{10,13})$/);
+        if (match) {
+          const ts = parseInt(match[1], 10);
+          d = new Date(ts < 10000000000 ? ts * 1000 : ts);
+        }
+      }
+    }
+    const joined = (d && !isNaN(d.getTime())) 
+      ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) 
+      : '—';
 
     const addrs = Array.isArray(u.addresses) ? u.addresses : [];
     const addr = addrs.find(a => a.isDefault) || (addrs.length ? addrs[addrs.length - 1] : null);

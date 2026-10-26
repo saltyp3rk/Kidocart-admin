@@ -210,8 +210,31 @@ module.exports = async (req, res) => {
             }
           }
 
+          // Compute accurate joined date if missing on mobile signup
+          let resolvedCreatedAt = user.createdAt;
+          if (!resolvedCreatedAt || isNaN(new Date(resolvedCreatedAt).getTime())) {
+            if (user._id) {
+              const idStr = String(user._id);
+              if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+                const sec = parseInt(idStr.substring(0, 8), 16);
+                if (!isNaN(sec) && sec > 1500000000) resolvedCreatedAt = new Date(sec * 1000);
+              }
+            }
+            if ((!resolvedCreatedAt || isNaN(new Date(resolvedCreatedAt).getTime())) && user.userId) {
+              const match = String(user.userId).match(/^user-(\d{10,13})$/);
+              if (match) {
+                const ts = parseInt(match[1], 10);
+                resolvedCreatedAt = new Date(ts < 10000000000 ? ts * 1000 : ts);
+              }
+            }
+            if ((!resolvedCreatedAt || isNaN(new Date(resolvedCreatedAt).getTime())) && user.updatedAt) {
+              resolvedCreatedAt = user.updatedAt;
+            }
+          }
+
           return {
             ...user,
+            createdAt: resolvedCreatedAt || user.createdAt,
             addresses: mergedAddresses
           };
         });
