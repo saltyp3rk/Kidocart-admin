@@ -116,18 +116,33 @@ async function createDelhiveryShipment(order) {
   }
 }
 
+// ─── PRODUCT SCHEMA & MODEL ───
+const productSchema = new mongoose.Schema({
+  name: String,
+  price: Number,
+  originalPrice: Number,
+  images: [String],
+  image: String,
+  category: String,
+  brand: String,
+  stock: Number
+}, { strict: false });
+const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
+
 // ─── ORDER SCHEMA (FIXED: Added missing tracking and tracking/cancellation fields) ───
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, unique: true },
   userId: String,
   items: [{
-    productId: String,
+    productId: { type: mongoose.Schema.Types.Mixed },
     name: String,
     price: Number,
     quantity: Number,
     size: String,
     color: String,
-    image: String
+    image: String,
+    images: [String],
+    product: { type: Object }
   }],
   subtotal: Number,
   shipping: Number,
@@ -156,9 +171,87 @@ const orderSchema = new mongoose.Schema({
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-});
+}, { strict: false });
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
+
+// ─── ENRICH ORDERS WITH PRODUCT DETAILS (Images, Names, Brands) ───
+async function enrichOrdersWithProducts(orders) {
+  if (!orders) return orders;
+  const isArray = Array.isArray(orders);
+  const list = isArray ? orders : [orders];
+
+  const idSet = new Set();
+  for (const o of list) {
+    if (Array.isArray(o.items)) {
+      for (const item of o.items) {
+        if (!item) continue;
+        const pid = (item.productId && typeof item.productId === 'object' && item.productId._id)
+          ? item.productId._id
+          : (item.productId || item.id || (item.product && (item.product._id || item.product.id)));
+        if (pid) idSet.add(String(pid));
+      }
+    }
+  }
+
+  if (idSet.size > 0) {
+    try {
+      const allIds = Array.from(idSet);
+      const objectIds = allIds
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+
+      const queryConds = [{ id: { $in: allIds } }];
+      if (objectIds.length > 0) {
+        queryConds.push({ _id: { $in: objectIds } });
+      }
+
+      const products = await Product.find({ $or: queryConds })
+        .select('name images image price brand category')
+        .lean();
+
+      const productMap = new Map();
+      for (const p of products) {
+        productMap.set(String(p._id), p);
+        if (p.id) productMap.set(String(p.id), p);
+      }
+
+      for (const o of list) {
+        if (Array.isArray(o.items)) {
+          for (const item of o.items) {
+            if (!item) continue;
+            const pid = (item.productId && typeof item.productId === 'object' && item.productId._id)
+              ? String(item.productId._id)
+              : String(item.productId || item.id || (item.product && (item.product._id || item.product.id)) || '');
+
+            const prod = productMap.get(pid) || (item.product && typeof item.product === 'object' ? item.product : null);
+            if (prod) {
+              const primaryImg = (Array.isArray(prod.images) && prod.images[0]) || prod.image || (Array.isArray(item.images) && item.images[0]) || item.image || '';
+              if (!item.name && prod.name) item.name = prod.name;
+              if (!item.image && primaryImg) item.image = primaryImg;
+              if (!item.images && prod.images) item.images = prod.images;
+              if (!item.brand && prod.brand) item.brand = prod.brand;
+              if (!item.product) {
+                item.product = {
+                  _id: prod._id,
+                  name: prod.name,
+                  images: prod.images || (primaryImg ? [primaryImg] : []),
+                  image: primaryImg,
+                  price: prod.price,
+                  brand: prod.brand
+                };
+              }
+            }
+          }
+        }
+      }
+    } catch (enrichErr) {
+      console.error('[ORDERS ENRICHMENT ERROR]:', enrichErr);
+    }
+  }
+
+  return isArray ? list : list[0];
+}
 
 // ─── TOKEN VERIFICATION ───
 async function verifyToken(authHeader) {
@@ -371,20 +464,23 @@ module.exports = async (req, res) => {
         const orders = await Order.find()
           .sort({ createdAt: -1 })
           .lean();
-        return res.status(200).json(orders);
+        const enrichedOrders = await enrichOrdersWithProducts(orders);
+        return res.status(200).json(enrichedOrders);
       }
 
       if (targetId) {
         const order = await Order.findOne({ 
           ...getSearchQuery(targetId), 
           userId: decoded.userId 
-        });
+        }).lean();
         if (!order) return res.status(404).json({ error: 'Order not found' });
-        return res.status(200).json(order);
+        const enrichedOrder = await enrichOrdersWithProducts(order);
+        return res.status(200).json(enrichedOrder);
       }
 
-      const orders = await Order.find({ userId: decoded.userId }).sort({ createdAt: -1 });
-      return res.status(200).json(orders);
+      const orders = await Order.find({ userId: decoded.userId }).sort({ createdAt: -1 }).lean();
+      const enrichedOrders = await enrichOrdersWithProducts(orders);
+      return res.status(200).json(enrichedOrders);
     }
 
     // CREATE ORDER
@@ -442,6 +538,7 @@ module.exports = async (req, res) => {
       }
 
       // Dispatch push notification to customer's mobile app via FCM
+      await enrichOrdersWithProducts(order).catch(() => {});
       await sendFcmOrderNotification(order, order.status).catch(err => {
         console.error('[PUSH-TRIGGER-ERROR]:', err.message);
       });

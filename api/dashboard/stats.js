@@ -63,6 +63,55 @@ module.exports = async (req, res) => {
       Order.find({}).sort({ createdAt: -1 }).limit(6).lean()
     ]);
 
+    // Enrich recent orders with product images and details
+    try {
+      const pidSet = new Set();
+      recentOrders.forEach(o => {
+        if (Array.isArray(o.items)) {
+          o.items.forEach(it => {
+            const raw = (it.productId && typeof it.productId === 'object' && it.productId._id)
+              ? it.productId._id
+              : (it.productId || it.id);
+            if (raw) pidSet.add(String(raw));
+          });
+        }
+      });
+      if (pidSet.size > 0) {
+        const allIds = Array.from(pidSet);
+        const objIds = allIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+        const prods = await Product.find({
+          $or: [{ _id: { $in: objIds } }, { id: { $in: allIds } }]
+        }).select('name images image price brand category').lean();
+
+        const pMap = new Map();
+        prods.forEach(p => {
+          pMap.set(String(p._id), p);
+          if (p.id) pMap.set(String(p.id), p);
+        });
+
+        recentOrders.forEach(o => {
+          if (Array.isArray(o.items)) {
+            o.items.forEach(it => {
+              const raw = (it.productId && typeof it.productId === 'object' && it.productId._id)
+                ? String(it.productId._id)
+                : String(it.productId || it.id || '');
+              const p = pMap.get(raw);
+              if (p) {
+                const img = (Array.isArray(p.images) && p.images[0]) || p.image || '';
+                if (!it.name && p.name) it.name = p.name;
+                if (!it.image && img) it.image = img;
+                if (!it.images && p.images) it.images = p.images;
+                if (!it.brand && p.brand) it.brand = p.brand;
+                if (!it.product) it.product = { _id: p._id, name: p.name, images: p.images, image: img, brand: p.brand };
+              }
+            });
+          }
+        });
+      }
+    } catch (enrichErr) {
+      console.warn('Dashboard recent orders product enrichment error:', enrichErr.message);
+    }
+
     let todaySales = 0;
     let totalSales = 0;
     let pendingOrders = 0;

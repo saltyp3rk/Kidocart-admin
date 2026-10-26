@@ -246,7 +246,16 @@ async function loadDashboardData() {
       if (customersEl) customersEl.textContent = s.totalCustomers || 0;
 
       if (recentOrdersWrap && statsData.recentOrders) {
+        allAdminOrders = statsData.recentOrders;
         renderDashboardRecentOrders(statsData.recentOrders);
+      }
+
+      // Preload product catalog in the background so order detail images/names resolve instantly
+      if (!allProducts || allProducts.length === 0) {
+        authFetch(`${API_BASE}/api/products`)
+          .then(r => r && r.ok ? r.json() : [])
+          .then(prods => { if (Array.isArray(prods)) allProducts = prods; })
+          .catch(() => {});
       }
       return;
     }
@@ -375,9 +384,18 @@ async function loadOrdersData() {
     </div>`;
 
   try {
-    const res = await authFetch(`${API_BASE}/api/orders?admin=true`);
+    const fetchPromises = [authFetch(`${API_BASE}/api/orders?admin=true`)];
+    if (!allProducts || allProducts.length === 0) {
+      fetchPromises.push(authFetch(`${API_BASE}/api/products`).then(r => r && r.ok ? r.json() : []).catch(() => []));
+    }
+
+    const [res, prods] = await Promise.all(fetchPromises);
     if (!res || !res.ok) {
       throw new Error((res && res.statusText) || 'Failed to fetch orders from server');
+    }
+
+    if (Array.isArray(prods) && prods.length > 0) {
+      allProducts = prods;
     }
 
     allAdminOrders = await res.json();
@@ -613,8 +631,109 @@ async function updateOrderStatus(orderId, newStatus) {
 // 6. ORDER DETAILS MODAL / DRAWER
 // ──────────────────────────────────────────────────────────────────────────
 
-function viewOrderDetails(orderId) {
-  const order = allAdminOrders.find(o => String(o.orderId || o._id) === String(orderId));
+// ─── BRANDED IMAGE FALLBACK & ERROR HANDLER ───
+const BRAND_FALLBACK_SVG = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"%3E%3Crect width="60" height="60" fill="%23FFF5EE" rx="8"/%3E%3Cpath d="M22 25 L38 25 L36 43 L24 43 Z" fill="none" stroke="%23FF6B35" stroke-width="2"/%3E%3Cpath d="M26 25 C26 21 34 21 34 25" fill="none" stroke="%23FF6B35" stroke-width="2"/%3E%3Ctext x="50%" y="78%" font-family="sans-serif" font-size="7.5" font-weight="700" fill="%23FF6B35" text-anchor="middle"%3EKidoCart%3C/text%3E%3C/svg%3E';
+
+function handleImgError(el) {
+  if (!el) return;
+  el.onerror = null;
+  el.src = BRAND_FALLBACK_SVG;
+}
+
+// ─── ORDER ITEMS RESOLUTION & RENDERING ENGINE ───
+function resolveOrderItem(item) {
+  const pId = (item.productId && typeof item.productId === 'object' && item.productId._id)
+    ? String(item.productId._id)
+    : String(item.productId || item.id || (item.product && (item.product._id || item.product.id)) || '');
+
+  const matched = (allProducts && allProducts.length > 0)
+    ? allProducts.find(p => String(p._id || p.id) === pId || (pId && (String(p._id).includes(pId) || String(p.id).includes(pId))))
+    : null;
+
+  const itemObj = (item.product && typeof item.product === 'object') ? item.product : null;
+  const prodObj = (item.productId && typeof item.productId === 'object') ? item.productId : null;
+
+  // 1. Resolve Image
+  let itemImg = item.image
+    || (Array.isArray(item.images) && item.images[0])
+    || (prodObj && prodObj.image)
+    || (prodObj && Array.isArray(prodObj.images) && prodObj.images[0])
+    || (itemObj && itemObj.image)
+    || (itemObj && Array.isArray(itemObj.images) && itemObj.images[0])
+    || (matched && matched.image)
+    || (matched && Array.isArray(matched.images) && matched.images[0])
+    || '';
+
+  if (!itemImg || typeof itemImg !== 'string' || itemImg.trim() === '') {
+    itemImg = BRAND_FALLBACK_SVG;
+  }
+
+  // 2. Resolve Name
+  let itemName = item.name
+    || (prodObj && prodObj.name)
+    || (itemObj && itemObj.name)
+    || (matched && matched.name)
+    || (pId ? `Product #${pId.slice(-6)}` : 'Product Item');
+
+  // 3. Resolve Brand/Category
+  let itemMeta = item.brand
+    || (prodObj && prodObj.brand)
+    || (itemObj && itemObj.brand)
+    || (matched && matched.brand)
+    || (matched && matched.category)
+    || '';
+
+  return { itemImg, itemName, itemMeta };
+}
+
+function renderOrderItemsHtml(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<p class="cell-sub" style="padding: 10px 0;">No items recorded in this order.</p>';
+  }
+
+  return items.map(item => {
+    const { itemImg, itemName, itemMeta } = resolveOrderItem(item);
+    const itemQty = item.quantity || 1;
+    const itemPrice = Number(item.price) || 0;
+    const sub = itemQty * itemPrice;
+
+    return `
+      <div class="order-item-row">
+        <img src="${escapeHtml(itemImg)}" alt="${escapeHtml(itemName)}" class="order-item-thumb" onerror="handleImgError(this)">
+        <div style="flex: 1; min-width: 0;">
+          <div class="cell-strong" style="font-size: 13.5px; white-space: normal; line-height: 1.35;">${escapeHtml(itemName)}</div>
+          <div class="cell-sub" style="margin-top: 3px;">
+            ${itemMeta ? `<span style="color: var(--primary); font-weight: 500;">${escapeHtml(itemMeta)}</span> &bull; ` : ''}
+            ${item.size ? `Size: <strong>${escapeHtml(item.size)}</strong> &bull; ` : ''}
+            ${item.color ? `Color: <strong>${escapeHtml(item.color)}</strong> &bull; ` : ''}
+            Qty: <strong>${itemQty}</strong> &times; ₹${itemPrice.toLocaleString('en-IN')}
+          </div>
+        </div>
+        <div class="cell-strong" style="font-size: 14px; text-align: right; white-space: nowrap;">₹${sub.toLocaleString('en-IN')}</div>
+      </div>`;
+  }).join('');
+}
+
+function updateOrderDetailsItems(order) {
+  const container = document.getElementById('od-items-container');
+  if (container && order) {
+    container.innerHTML = renderOrderItemsHtml(order.items || []);
+  }
+}
+
+async function viewOrderDetails(orderId) {
+  let order = allAdminOrders.find(o => String(o.orderId || o._id) === String(orderId));
+  
+  // If not found in memory, fetch fresh from server
+  if (!order) {
+    try {
+      const res = await authFetch(`${API_BASE}/api/orders?orderId=${encodeURIComponent(orderId)}`);
+      if (res && res.ok) {
+        order = await res.json();
+      }
+    } catch (e) {}
+  }
+
   if (!order) {
     showToast('Order details not found', 'error');
     return;
@@ -653,27 +772,6 @@ function viewOrderDetails(orderId) {
   const items = Array.isArray(order.items) ? order.items : [];
   const tracking = order.trackingNumber || '';
 
-  const itemsHtml = items.map(item => {
-    const itemImg = item.image || (item.product && item.product.images && item.product.images[0]) || 'https://via.placeholder.com/60?text=KidoCart';
-    const itemName = item.name || (item.product && item.product.name) || 'Product Item';
-    const itemQty = item.quantity || 1;
-    const itemPrice = Number(item.price) || 0;
-    const sub = itemQty * itemPrice;
-
-    return `
-      <div class="order-item-row">
-        <img src="${escapeHtml(itemImg)}" alt="${escapeHtml(itemName)}" class="order-item-thumb" onerror="this.src='https://via.placeholder.com/60?text=KidoCart'">
-        <div style="flex: 1; min-width: 0;">
-          <div class="cell-strong" style="font-size: 13.5px;">${escapeHtml(itemName)}</div>
-          <div class="cell-sub">
-            ${item.size ? `Size: <strong>${escapeHtml(item.size)}</strong> &bull; ` : ''}
-            Qty: <strong>${itemQty}</strong> &times; ₹${itemPrice.toLocaleString('en-IN')}
-          </div>
-        </div>
-        <div class="cell-strong" style="font-size: 14px;">₹${sub.toLocaleString('en-IN')}</div>
-      </div>`;
-  }).join('');
-
   bodyEl.innerHTML = `
     <div class="order-detail-grid">
       <div class="order-info-card">
@@ -707,7 +805,7 @@ function viewOrderDetails(orderId) {
     <!-- Items List -->
     <div style="margin-bottom: 12px;">
       <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main);">Ordered Items (${items.length})</h4>
-      <div class="order-items-list">${itemsHtml || '<p class="cell-sub">No items recorded in this order.</p>'}</div>
+      <div class="order-items-list" id="od-items-container">${renderOrderItemsHtml(items)}</div>
     </div>
 
     <!-- Financial Summary -->
@@ -732,6 +830,19 @@ function viewOrderDetails(orderId) {
     </div>`;
 
   if (modal) modal.classList.add('active');
+
+  // If products were not yet loaded into memory, fetch them and live-update items list
+  if (!allProducts || allProducts.length === 0) {
+    authFetch(`${API_BASE}/api/products`)
+      .then(r => r && r.ok ? r.json() : [])
+      .then(prods => {
+        if (Array.isArray(prods) && prods.length > 0) {
+          allProducts = prods;
+          updateOrderDetailsItems(order);
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 function closeOrderDetailsModal() {
@@ -814,9 +925,9 @@ function renderProducts(products) {
 
   list.innerHTML = products.map(p => {
     const pId = p._id || p.id;
-    const firstImg = (Array.isArray(p.images) && p.images.length > 0) 
+    const firstImg = (Array.isArray(p.images) && p.images.length > 0 && p.images[0]) 
       ? p.images[0] 
-      : 'https://via.placeholder.com/100?text=KidoCart';
+      : BRAND_FALLBACK_SVG;
 
     const stock = Number(p.stock) || 0;
     let stockTag = `<span class="product-stock-tag stock-in">In Stock (${stock})</span>`;
@@ -831,7 +942,7 @@ function renderProducts(products) {
 
     return `
       <div class="product-card">
-        <img src="${escapeHtml(firstImg)}" alt="${escapeHtml(p.name)}" class="product-card-thumb" onerror="this.src='https://via.placeholder.com/100?text=KidoCart'">
+        <img src="${escapeHtml(firstImg)}" alt="${escapeHtml(p.name)}" class="product-card-thumb" onerror="handleImgError(this)">
         <div class="product-card-body">
           <div class="product-card-title" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
           <div class="product-card-meta">
