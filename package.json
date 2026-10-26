@@ -4,8 +4,9 @@
   "description": "KidoCart Admin Panel",
   "private": true,
   "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
     "build": "echo 'done'",
-    "dev": "vercel dev",
     "deploy": "vercel --prod"
   },
   "dependencies": {

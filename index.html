@@ -3,278 +3,525 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>KidoCart Admin</title>
+  <title>KidoCart Admin — Management Dashboard</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    /* Minimal styles for promo table to avoid touching your external CSS */
-    .promo-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .promo-table th, .promo-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--gray-200, #E5E5E5); }
-    .promo-badge { background: var(--accent-light, #FFF0EB); color: var(--accent, #FF6B35); padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 14px; letter-spacing: 1px; }
-  </style>
 </head>
 <body>
 
+  <!-- Floating Toast Notifications -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Mobile Header -->
   <header class="app-header">
-    <div class="logo">Kido<span>Cart</span></div>
-    <div class="header-actions">
-      <button class="icon-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="mobile-nav-toggle" onclick="toggleMobileDrawer()" title="Open Navigation Menu">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="brand-logo">
+        <div class="logo-icon"><i class="fas fa-shopping-bag"></i></div>
+        <div>Kido<span class="highlight">Cart</span></div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="icon-btn" onclick="logout()" title="Log Out">
+        <i class="fas fa-arrow-right-from-bracket"></i>
+      </button>
     </div>
   </header>
 
+  <!-- Mobile Drawer Overlay & Slideout Panel -->
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay" onclick="toggleMobileDrawer()"></div>
+  <aside class="mobile-drawer" id="mobile-drawer">
+    <div class="drawer-header">
+      <div class="brand-logo">
+        <div class="logo-icon"><i class="fas fa-shopping-bag"></i></div>
+        <div>Kido<span class="highlight">Cart</span></div>
+      </div>
+      <button class="drawer-close" onclick="toggleMobileDrawer()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <nav class="side-nav">
+      <div class="nav-section-title">Store Management</div>
+      <a href="#" class="nav-item active" data-target="dashboard-view" onclick="toggleMobileDrawer()"><i class="fas fa-chart-pie"></i> Dashboard</a>
+      <a href="#" class="nav-item" data-target="products-view" onclick="toggleMobileDrawer()"><i class="fas fa-box"></i> Products</a>
+      <a href="#" class="nav-item" data-target="orders-view" onclick="toggleMobileDrawer()"><i class="fas fa-shopping-bag"></i> Orders</a>
+      <a href="#" class="nav-item" data-target="customers-view" onclick="toggleMobileDrawer()"><i class="fas fa-users"></i> Customers</a>
+      <a href="#" class="nav-item" data-target="promos-view" onclick="toggleMobileDrawer()"><i class="fas fa-tags"></i> Promos</a>
+      <div class="nav-section-title">App Customization</div>
+      <a href="#" class="nav-item" data-target="content-view" onclick="toggleMobileDrawer()"><i class="fas fa-bullhorn"></i> App Content</a>
+      <a href="#" class="nav-item" data-target="notifications-view" onclick="toggleMobileDrawer()"><i class="fas fa-paper-plane"></i> Notifications</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sidebar-logout" onclick="logout()">
+        <i class="fas fa-arrow-right-from-bracket"></i> Log Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Desktop Layout Shell -->
   <div class="app-container">
+    
+    <!-- Desktop Sidebar -->
     <aside class="desktop-sidebar">
-      <div class="logo">Kido<span>Cart</span></div>
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <div class="logo-icon"><i class="fas fa-shopping-bag"></i></div>
+          <div>Kido<span class="highlight">Cart</span></div>
+        </div>
+        <span class="admin-tag">Admin</span>
+      </div>
+
       <nav class="side-nav">
+        <div class="nav-section-title">Store Management</div>
         <a href="#" class="nav-item active" data-target="dashboard-view"><i class="fas fa-chart-pie"></i> Dashboard</a>
         <a href="#" class="nav-item" data-target="products-view"><i class="fas fa-box"></i> Products</a>
         <a href="#" class="nav-item" data-target="orders-view"><i class="fas fa-shopping-bag"></i> Orders</a>
         <a href="#" class="nav-item" data-target="customers-view"><i class="fas fa-users"></i> Customers</a>
-        <!-- NEW PROMO TAB -->
-        <a href="#" class="nav-item" data-target="promo-view"><i class="fas fa-tags"></i> Promos</a>
+        <a href="#" class="nav-item" data-target="promos-view"><i class="fas fa-tags"></i> Promos</a>
+        
+        <div class="nav-section-title">Mobile Experience</div>
         <a href="#" class="nav-item" data-target="content-view"><i class="fas fa-bullhorn"></i> App Content</a>
         <a href="#" class="nav-item" data-target="notifications-view"><i class="fas fa-paper-plane"></i> Notifications</a>
       </nav>
-      <button class="sidebar-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Log Out</button>
+
+      <div class="sidebar-footer">
+        <button class="sidebar-logout" onclick="logout()">
+          <i class="fas fa-arrow-right-from-bracket"></i> Log Out
+        </button>
+      </div>
     </aside>
 
+    <!-- Main Content Workspace -->
     <main class="main-content">
-      
-      <section id="dashboard-view" class="view-section active">
-        <div class="page-header">
-          <h1>Overview</h1>
-          <button class="icon-btn" onclick="loadDashboardData()" title="Refresh"><i class="fas fa-sync"></i></button>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-title">Today's Sales</span>
-            <h2 class="stat-value" id="dash-sales">₹0</h2>
-          </div>
-          <div class="stat-card">
-            <span class="stat-title">Pending Orders</span>
-            <h2 class="stat-value" id="dash-pending">0</h2>
-          </div>
-          <div class="stat-card">
-            <span class="stat-title">Low Stock Alerts</span>
-            <h2 class="stat-value" id="dash-stock" style="color: var(--danger, #EF4444);">0</h2>
-          </div>
-        </div>
-      </section>
+      <div class="content-wrapper">
 
-      <section id="products-view" class="view-section">
-        <div class="page-header">
-          <h1>Products</h1>
-          <button class="btn btn-primary" onclick="openProductModal()"><i class="fas fa-plus"></i> Add</button>
-        </div>
-        <div style="margin-bottom: 20px;">
-          <input type="text" id="product-search" placeholder="🔍 Search products..." onkeyup="filterProducts()" class="form-input">
-        </div>
-        <div class="product-grid" id="products-list">
-          <div class="card empty-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading products...</p>
+        <!-- ========================================================== -->
+        <!-- VIEW 1: DASHBOARD OVERVIEW -->
+        <!-- ========================================================== -->
+        <section id="dashboard-view" class="view-section active">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Store Overview</h1>
+              <span class="subtitle">Real-time metrics, revenue monitoring and store performance</span>
+            </div>
+            <div class="header-actions">
+              <button class="icon-btn" onclick="loadDashboardData()" title="Refresh Overview"><i class="fas fa-rotate"></i></button>
+              <button class="btn btn-primary" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
+            </div>
           </div>
-        </div>
-      </section>
 
-      <section id="orders-view" class="view-section">
-        <div class="page-header">
-          <h1>Orders</h1>
-        </div>
-        
-        <div style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
-          <button class="btn-secondary" onclick="renderOrders('all')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">All</button>
-          <button class="btn-secondary" onclick="renderOrders('pending')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">Pending</button>
-          <button class="btn-secondary" onclick="renderOrders('processing')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">Processing</button>
-          <button class="btn-secondary" onclick="renderOrders('shipped')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">Shipped</button>
-          <button class="btn-secondary" onclick="renderOrders('delivered')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">Delivered</button>
-          <button class="btn-secondary" onclick="renderOrders('cancelled')" style="border-radius: 20px; padding: 6px 16px; background-color: #000000">Cancelled</button>
-        </div>
-
-        <div id="orders-list-container">
-          <div class="card empty-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading orders...</p>
+          <!-- Quick Action Shortcuts -->
+          <div class="quick-actions-bar">
+            <button class="quick-action-btn" onclick="navigateToView('products-view')">
+              <i class="fas fa-box" style="color: var(--primary);"></i> Manage Catalog
+            </button>
+            <button class="quick-action-btn" onclick="navigateToView('orders-view')">
+              <i class="fas fa-shopping-bag" style="color: var(--secondary);"></i> Review Orders
+            </button>
+            <button class="quick-action-btn" onclick="navigateToView('customers-view')">
+              <i class="fas fa-users" style="color: #10B981;"></i> Customer Directory
+            </button>
+            <button class="quick-action-btn" onclick="navigateToView('promos-view')">
+              <i class="fas fa-tags" style="color: var(--accent-pink);"></i> Create Promo
+            </button>
+            <button class="quick-action-btn" onclick="navigateToView('notifications-view')">
+              <i class="fas fa-paper-plane" style="color: var(--primary);"></i> Send Notification
+            </button>
           </div>
-        </div>
-      </section>
-      
-      <section id="customers-view" class="view-section">
-        <div class="page-header">
-          <h1>Customers</h1>
-        </div>
-        <div class="card empty-state">
-          <i class="fas fa-users"></i>
-          <p>Customer list will go here</p>
-        </div>
-      </section>
 
-      <!-- ══════════════════════════════════════════════════════════ -->
-      <!-- NEW PROMO CODE SECTION -->
-      <!-- ══════════════════════════════════════════════════════════ -->
-      <section id="promo-view" class="view-section">
-        <div class="page-header">
-          <h1>Promo Codes</h1>
-        </div>
-        
-        <div class="card" style="margin-bottom: 24px;">
-          <h3 style="margin-top:0;">Generate Random Code</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Discount Type</label>
-              <select id="promo-type" class="form-input">
-                <option value="percentage">Percentage Off (%)</option>
-                <option value="flat">Flat Amount Off (₹)</option>
-                <option value="free_shipping">Free Delivery</option>
+          <!-- KPI Metric Cards Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-info">
+                <span class="stat-title">Today's Revenue</span>
+                <h2 class="stat-value" id="dash-sales">₹0</h2>
+                <span class="stat-subtitle" id="dash-sales-sub">Excludes cancelled orders</span>
+              </div>
+              <div class="stat-icon green"><i class="fas fa-indian-rupee-sign"></i></div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <span class="stat-title">Pending Orders</span>
+                <h2 class="stat-value" id="dash-pending">0</h2>
+                <span class="stat-subtitle" id="dash-pending-sub">Require immediate action</span>
+              </div>
+              <div class="stat-icon amber"><i class="fas fa-clock"></i></div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <span class="stat-title">Low Stock Alerts</span>
+                <h2 class="stat-value" id="dash-stock">0</h2>
+                <span class="stat-subtitle">Products with &le; 10 units</span>
+              </div>
+              <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <span class="stat-title">Total Orders</span>
+                <h2 class="stat-value" id="dash-total-orders">0</h2>
+                <span class="stat-subtitle">All-time store volume</span>
+              </div>
+              <div class="stat-icon indigo"><i class="fas fa-boxes-packing"></i></div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-info">
+                <span class="stat-title">Customers</span>
+                <h2 class="stat-value" id="dash-customers">0</h2>
+                <span class="stat-subtitle">Registered user accounts</span>
+              </div>
+              <div class="stat-icon orange"><i class="fas fa-user-group"></i></div>
+            </div>
+          </div>
+
+          <!-- Recent Orders Preview Table -->
+          <div class="card" style="margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Recent Orders</h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0;">Latest customer purchases across the mobile app and storefront</p>
+              </div>
+              <button class="btn btn-secondary" onclick="navigateToView('orders-view')" style="padding: 6px 12px; font-size: 12px;">
+                View All Orders <i class="fas fa-arrow-right" style="font-size: 11px;"></i>
+              </button>
+            </div>
+            <div id="dash-recent-orders-container">
+              <div class="empty-state" style="padding: 24px;"><i class="fas fa-spinner fa-spin empty-icon"></i><p>Loading recent orders...</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================== -->
+        <!-- VIEW 2: PRODUCTS CATALOG -->
+        <!-- ========================================================== -->
+        <section id="products-view" class="view-section">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Products <span id="products-count-badge" style="font-size: 13px; font-weight: 600; color: var(--text-muted);">(0)</span></h1>
+              <span class="subtitle">Manage items, pricing, inventory stock, and catalog images</span>
+            </div>
+            <div class="header-actions">
+              <button class="icon-btn" onclick="loadProductsData()" title="Refresh Catalog"><i class="fas fa-rotate"></i></button>
+              <button class="btn btn-primary" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
+            </div>
+          </div>
+
+          <!-- Products Filters & Search -->
+          <div class="filters-row">
+            <div class="search-box-wrapper">
+              <i class="fas fa-magnifying-glass search-icon"></i>
+              <input type="text" id="product-search" placeholder="Search by product name or brand..." oninput="filterProducts()" class="form-input">
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <select id="product-category-filter" class="form-input" style="width: auto; min-width: 150px;" onchange="filterProducts()">
+                <option value="all">All Categories</option>
+                <option value="clothing">Clothing</option>
+                <option value="toys">Toys</option>
+                <option value="feeding">Feeding</option>
+                <option value="diapers">Diapers &amp; Care</option>
+              </select>
+              <select id="product-stock-filter" class="form-input" style="width: auto; min-width: 140px;" onchange="filterProducts()">
+                <option value="all">All Stock Status</option>
+                <option value="in-stock">In Stock</option>
+                <option value="low-stock">Low Stock (&le; 10)</option>
+                <option value="out-of-stock">Out of Stock</option>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">Value (Leave 0 for Free Delivery)</label>
-              <input type="number" id="promo-value" class="form-input" placeholder="e.g. 10">
+          </div>
+
+          <!-- Product Cards Grid -->
+          <div class="product-grid" id="products-list">
+            <div class="empty-state" style="grid-column: 1/-1;">
+              <i class="fas fa-spinner fa-spin empty-icon"></i>
+              <h3>Loading products</h3>
+              <p>Fetching catalog items from the store database...</p>
             </div>
           </div>
-          <button class="btn btn-primary" onclick="generatePromoCode()"><i class="fas fa-magic"></i> Generate Code</button>
-        </div>
+        </section>
 
-        <div class="card">
-          <h3 style="margin-top:0;">Active Promo Codes</h3>
-          <div id="promo-list-container" style="overflow-x: auto;">
-            <p style="color: var(--text-muted, #737373);"><i class="fas fa-spinner fa-spin"></i> Loading codes...</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- ══════════════════════════════════════════════════════════ -->
-      <!-- APP CONTENT (Announcement / Marquee control for mobile) -->
-      <!-- ══════════════════════════════════════════════════════════ -->
-      <section id="content-view" class="view-section">
-        <div class="page-header">
-          <h1>App Content</h1>
-        </div>
-
-        <div class="card" style="margin-bottom: 20px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
-            <div>
-              <h3 style="margin:0; font-size:16px;"><i class="fas fa-bullhorn" style="color:var(--accent); margin-right:6px;"></i> Announcement Bar</h3>
-              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">The scrolling messages shown at the top of the mobile app home screen.</p>
+        <!-- ========================================================== -->
+        <!-- VIEW 3: ORDERS MANAGEMENT -->
+        <!-- ========================================================== -->
+        <section id="orders-view" class="view-section">
+          <!-- Rendered dynamically by app.js with high-contrast table & filters -->
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Orders</h1>
+              <span class="subtitle">Track fulfillments, customer deliveries and payment statuses</span>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="ann-enabled" checked>
-              <span class="switch-track"></span>
-            </label>
           </div>
-
-          <!-- Live preview -->
-          <div id="ann-preview" class="ann-preview"><div id="ann-preview-track" class="ann-preview-track"></div></div>
-
-          <label class="form-label" style="margin-top:16px;">Messages</label>
-          <div id="ann-messages"></div>
-          <button class="btn-secondary" onclick="addMessageRow()" style="margin-top:6px;"><i class="fas fa-plus"></i> Add message</button>
-
-          <div style="margin-top:20px; display:flex; gap:10px;">
-            <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-save"></i> Save & Publish</button>
-            <button class="btn-secondary" onclick="loadAppContent()" style="border-radius:10px;"><i class="fas fa-rotate"></i> Reset</button>
+          <div class="empty-state">
+            <i class="fas fa-spinner fa-spin empty-icon"></i>
+            <h3>Loading orders</h3>
+            <p>Connecting securely to order management API...</p>
           </div>
-        </div>
+        </section>
 
-        <div class="card">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
-            <div>
-              <h3 style="margin:0; font-size:16px;"><i class="fas fa-bolt" style="color:var(--accent); margin-right:6px;"></i> Flash Sale Timer</h3>
-              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">Countdown banner on the app home. The phone counts down to the end time you set.</p>
+        <!-- ========================================================== -->
+        <!-- VIEW 4: CUSTOMERS DIRECTORY -->
+        <!-- ========================================================== -->
+        <section id="customers-view" class="view-section">
+          <!-- Rendered dynamically by app.js with verified customers table -->
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Customers</h1>
+              <span class="subtitle">Customer accounts, delivery addresses and registration channels</span>
             </div>
-            <label class="switch"><input type="checkbox" id="fs-enabled"><span class="switch-track"></span></label>
           </div>
-          <div class="form-row" style="margin-top:14px;">
-            <div class="form-group"><label class="form-label">Title</label><input type="text" id="fs-title" class="form-input" placeholder="Flash Sale"></div>
-            <div class="form-group"><label class="form-label">Subtitle</label><input type="text" id="fs-subtitle" class="form-input" placeholder="Ends in — grab them fast!"></div>
+          <div class="empty-state">
+            <i class="fas fa-spinner fa-spin empty-icon"></i>
+            <h3>Loading customers</h3>
+            <p>Retrieving registered users...</p>
           </div>
-          <div class="form-group"><label class="form-label">Ends at</label><input type="datetime-local" id="fs-end" class="form-input"></div>
-          <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-save"></i> Save &amp; Publish</button>
-        </div>
+        </section>
 
-        <div class="card" style="margin-top:20px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
-            <div>
-              <h3 style="margin:0; font-size:16px;"><i class="fas fa-images" style="color:var(--accent); margin-right:6px;"></i> Home Carousel</h3>
-              <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">Promo banners shown at the top of the app home. Upload an image, add a title &amp; optional category to open on tap.</p>
+        <!-- ========================================================== -->
+        <!-- VIEW 5: PROMO CODES -->
+        <!-- ========================================================== -->
+        <section id="promos-view" class="view-section">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Promo Codes</h1>
+              <span class="subtitle">Discount vouchers and promotional codes for storefront &amp; app checkout</span>
             </div>
-            <button class="btn-secondary" onclick="addCarouselBanner()"><i class="fas fa-plus"></i> Add banner</button>
+            <div class="header-actions">
+              <button class="icon-btn" onclick="fetchPromoCodes()" title="Refresh Promo List"><i class="fas fa-rotate"></i></button>
+            </div>
           </div>
-          <div id="carousel-list"></div>
-          <button class="btn btn-primary" onclick="saveAppContent()" style="margin-top:6px;"><i class="fas fa-save"></i> Save &amp; Publish</button>
-        </div>
-      </section>
 
-      <section id="notifications-view" class="view-section">
-        <div class="page-header">
-          <h1>Push Notifications</h1>
-          <button class="icon-btn" onclick="loadNotificationStats()" title="Refresh"><i class="fas fa-sync"></i></button>
-        </div>
-
-        <div class="stats-grid" style="margin-bottom: 24px;">
-          <div class="stat-card">
-            <span class="stat-title">Registered App Devices</span>
-            <h2 class="stat-value" id="notif-device-count">0</h2>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 style="margin-top:0; font-size:16px;"><i class="fas fa-paper-plane" style="color:var(--accent); margin-right:6px;"></i> Broadcast Push Notification</h3>
-          <p style="margin:4px 0 16px; font-size:13px; color:var(--text-muted);">Broadcast instant push notifications to all customers who have installed the KidoCart mobile app.</p>
-
-          <form id="push-notification-form" onsubmit="handleSendPushNotification(event)">
-            <div class="form-group">
-              <label class="form-label">Notification Title *</label>
-              <input type="text" id="notif-title" class="form-input" placeholder="e.g. Flash Sale Live! 🚀" required>
+          <!-- Generate Promo Form Card -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div style="margin-bottom: 16px;">
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Create Promo Voucher</h3>
+              <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0;">Create a custom coupon code or automatically generate a high-converting discount voucher</p>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Notification Message *</label>
-              <textarea id="notif-body" class="form-input" rows="3" placeholder="e.g. Grab 40% off on all baby clothes & toys today only!" required></textarea>
+            <form id="promo-create-form" onsubmit="handleCreatePromo(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Coupon Code <span style="font-weight: 400; color: var(--text-muted);">(Leave blank to auto-generate)</span></label>
+                  <input type="text" id="promo-code-input" class="form-input" placeholder="e.g. SUMMER50" style="text-transform: uppercase;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Discount Type <span class="req">*</span></label>
+                  <select id="promo-type" class="form-input" onchange="handlePromoTypeChange()">
+                    <option value="percentage">Percentage Discount (%)</option>
+                    <option value="flat">Flat Amount Discount (₹)</option>
+                    <option value="free_shipping">Free Delivery (100% Shipping Waiver)</option>
+                  </select>
+                </div>
+                <div class="form-group" id="promo-value-group">
+                  <label class="form-label" id="promo-value-label">Discount Value <span class="req">*</span></label>
+                  <input type="number" id="promo-value" class="form-input" placeholder="e.g. 15" min="1">
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                <button type="submit" class="btn btn-primary" id="btn-create-promo">
+                  <i class="fas fa-wand-magic-sparkles"></i> Create Promo Code
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="generateRandomPromoCodeName()">
+                  <i class="fas fa-shuffle"></i> Suggest Code Name
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Active Promo Codes Table Card -->
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Active Promo Codes</h3>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0;">Codes actively redeemable by shoppers at cart checkout</p>
+              </div>
+            </div>
+            <div id="promo-list-container">
+              <div class="empty-state" style="padding: 24px;"><i class="fas fa-spinner fa-spin empty-icon"></i><p>Loading promo codes...</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================================== -->
+        <!-- VIEW 6: APP CONTENT & MOBILE EXPERIENCE -->
+        <!-- ========================================================== -->
+        <section id="content-view" class="view-section">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>App Content</h1>
+              <span class="subtitle">Live controls for mobile app top banner marquee, flash sale countdown, and hero banners</span>
+            </div>
+            <div class="header-actions">
+              <button class="icon-btn" onclick="loadAppContent()" title="Reset to Published"><i class="fas fa-rotate"></i></button>
+              <button class="btn btn-primary" onclick="saveAppContent()"><i class="fas fa-cloud-arrow-up"></i> Save &amp; Publish</button>
+            </div>
+          </div>
+
+          <!-- Section 1: Announcement Bar -->
+          <div class="card" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-bullhorn" style="color: var(--primary);"></i> Top Announcement Bar
+                </h3>
+                <p style="margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted);">The animated scrolling text strip visible across the top of the mobile home screen</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="ann-enabled" checked>
+                <span class="switch-track"></span>
+              </label>
+            </div>
+
+            <!-- Live Animated Preview -->
+            <div id="ann-preview" class="ann-preview">
+              <div id="ann-preview-track" class="ann-preview-track"></div>
+            </div>
+
+            <label class="form-label" style="margin-top: 16px;">Marquee Messages</label>
+            <div id="ann-messages"></div>
+            <button class="btn btn-secondary" onclick="addMessageRow()" style="margin-top: 8px; font-size: 12px;">
+              <i class="fas fa-plus"></i> Add Marquee Message
+            </button>
+          </div>
+
+          <!-- Section 2: Flash Sale Countdown -->
+          <div class="card" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-bolt" style="color: var(--warning);"></i> Flash Sale Countdown Timer
+                </h3>
+                <p style="margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted);">Triggers a high-urgency countdown timer banner synchronized to server time</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="fs-enabled">
+                <span class="switch-track"></span>
+              </label>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">Notification Type</label>
-                <select id="notif-type" class="form-input">
-                  <option value="promo">Promotion / Offer</option>
-                  <option value="order">Order Update</option>
-                  <option value="delivery">Delivery Status</option>
-                  <option value="system">System / Announcement</option>
-                </select>
+                <label class="form-label">Banner Title</label>
+                <input type="text" id="fs-title" class="form-input" placeholder="Flash Sale">
               </div>
               <div class="form-group">
-                <label class="form-label">Deep Link / Category (Optional)</label>
-                <input type="text" id="notif-url" class="form-input" placeholder="e.g. toys or clothing">
+                <label class="form-label">Subtitle</label>
+                <input type="text" id="fs-subtitle" class="form-input" placeholder="Ends in — grab discounts fast!">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Countdown Expiry Date &amp; Time</label>
+                <input type="datetime-local" id="fs-end" class="form-input">
               </div>
             </div>
+          </div>
 
-            <div style="margin-top: 16px;">
-              <button type="submit" class="btn btn-primary" id="btn-send-notif">
-                <i class="fas fa-paper-plane"></i> Send Push Notification
+          <!-- Section 3: Hero Carousel Banners -->
+          <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px;">
+              <div>
+                <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-images" style="color: var(--secondary);"></i> Home Hero Carousel
+                </h3>
+                <p style="margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted);">High-resolution promotional hero sliders displayed prominently on customer devices</p>
+              </div>
+              <button class="btn btn-secondary" onclick="addCarouselBanner()" style="font-size: 12px;">
+                <i class="fas fa-plus"></i> Add Banner
               </button>
             </div>
-          </form>
+            <div id="carousel-list"></div>
+          </div>
+        </section>
 
-          <div id="notif-status-box" style="display:none; margin-top:20px; padding:12px; border-radius:8px; font-size:13px;"></div>
-        </div>
-      </section>
+        <!-- ========================================================== -->
+        <!-- VIEW 7: PUSH NOTIFICATIONS BROADCAST -->
+        <!-- ========================================================== -->
+        <section id="notifications-view" class="view-section">
+          <div class="page-header">
+            <div class="page-header-text">
+              <h1>Push Notifications</h1>
+              <span class="subtitle">Broadcast instant FCM push notifications to all installed mobile app users</span>
+            </div>
+            <div class="header-actions">
+              <button class="icon-btn" onclick="loadNotificationStats()" title="Refresh Device Count"><i class="fas fa-rotate"></i></button>
+            </div>
+          </div>
 
+          <!-- Audience Device Count KPI -->
+          <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="stat-card" style="max-width: 320px;">
+              <div class="stat-info">
+                <span class="stat-title">Active App Installations</span>
+                <h2 class="stat-value" id="notif-device-count">0</h2>
+                <span class="stat-subtitle">Registered FCM push tokens in DB</span>
+              </div>
+              <div class="stat-icon indigo"><i class="fas fa-mobile-screen"></i></div>
+            </div>
+          </div>
+
+          <!-- Broadcast Compose Form Card -->
+          <div class="card">
+            <div style="margin-bottom: 16px;">
+              <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Compose Broadcast Message</h3>
+              <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0;">Broadcasts an alert directly to notification trays on Android &amp; iOS devices</p>
+            </div>
+
+            <form id="push-notification-form" onsubmit="handleSendPushNotification(event)">
+              <div class="form-group">
+                <label class="form-label">Notification Title <span class="req">*</span></label>
+                <input type="text" id="notif-title" class="form-input" placeholder="e.g. Weekend Flash Sale is Live!" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Notification Message <span class="req">*</span></label>
+                <textarea id="notif-body" class="form-input" rows="3" placeholder="e.g. Save flat 30% on all baby outfits and accessories today only. Tap to shop!" required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Notification Category</label>
+                  <select id="notif-type" class="form-input">
+                    <option value="promo">Promotional / Sale Offer</option>
+                    <option value="order">Order Update</option>
+                    <option value="delivery">Delivery Announcement</option>
+                    <option value="system">Store System Announcement</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Deep Link / Filter Category <span style="font-weight: 400; color: var(--text-muted);">(Optional)</span></label>
+                  <input type="text" id="notif-url" class="form-input" placeholder="e.g. clothing, toys, feeding">
+                </div>
+              </div>
+
+              <div style="margin-top: 18px;">
+                <button type="submit" class="btn btn-primary" id="btn-send-notif">
+                  <i class="fas fa-paper-plane"></i> Send Push Notification
+                </button>
+              </div>
+            </form>
+
+            <div id="notif-status-box" style="display:none; margin-top:20px; padding:14px; border-radius: var(--radius-md); font-size:13px;"></div>
+          </div>
+        </section>
+
+      </div>
     </main>
   </div>
 
+  <!-- Mobile Bottom Navigation (for phone viewports) -->
   <nav class="bottom-nav">
-    <a href="#" class="nav-item active" data-target="dashboard-view"><i class="fas fa-chart-pie"></i><span>Home</span></a>
+    <a href="#" class="nav-item active" data-target="dashboard-view"><i class="fas fa-chart-pie"></i><span>Overview</span></a>
     <a href="#" class="nav-item" data-target="products-view"><i class="fas fa-box"></i><span>Products</span></a>
     <a href="#" class="nav-item" data-target="orders-view"><i class="fas fa-shopping-bag"></i><span>Orders</span></a>
-    <!-- NEW PROMO BOTTOM NAV (Mobile) -->
-    <a href="#" class="nav-item" data-target="promo-view"><i class="fas fa-tags"></i><span>Promos</span></a>
+    <a href="#" class="nav-item" data-target="promos-view"><i class="fas fa-tags"></i><span>Promos</span></a>
+    <a href="#" class="nav-item" onclick="toggleMobileDrawer(); return false;"><i class="fas fa-ellipsis"></i><span>More</span></a>
   </nav>
 
-  <!-- Product Modal (Unchanged) -->
+  <!-- ========================================================== -->
+  <!-- MODAL: ADD / EDIT PRODUCT -->
+  <!-- ========================================================== -->
   <div class="modal-overlay" id="product-modal">
     <div class="modal">
       <div class="modal-header">
@@ -282,130 +529,114 @@
         <button class="icon-btn" onclick="closeProductModal()"><i class="fas fa-times"></i></button>
       </div>
       <form id="product-form">
-        <input type="hidden" id="modal-product-id">
-        <div class="form-group"><label class="form-label">Product Name *</label><input type="text" id="modal-name" class="form-input" required></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Category *</label>
-            <select id="modal-category" class="form-input" required>
-              <option value="clothing">Clothing</option><option value="toys">Toys</option>
-              <option value="feeding">Feeding</option><option value="diapers">Diapers & Care</option>
-            </select>
+        <div class="modal-body">
+          <input type="hidden" id="modal-product-id">
+          
+          <div class="form-group">
+            <label class="form-label">Product Name <span class="req">*</span></label>
+            <input type="text" id="modal-name" class="form-input" placeholder="e.g. Organic Cotton Baby Onesie" required>
           </div>
-          <div class="form-group"><label class="form-label">Brand</label><input type="text" id="modal-brand" class="form-input" placeholder="e.g. BabyJoy"></div>
-        </div>
-        <div class="form-group"><label class="form-label">Description *</label><textarea id="modal-description" class="form-input" rows="3" required></textarea></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Actual Price (₹)</label><input type="number" id="modal-original-price" class="form-input"></div>
-          <div class="form-group"><label class="form-label">Discounted Price (₹) *</label><input type="number" id="modal-price" class="form-input" required></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">Stock *</label><input type="number" id="modal-stock" class="form-input" required></div>
-          <div class="form-group file-upload-box" style="padding: 10px; margin-bottom: 0;">
-            <label class="form-label" style="margin-bottom: 2px;">Upload Images</label>
-            <small style="display:block; margin-bottom: 5px; color:var(--text-muted);">Select multiple if needed</small>
-            <input type="file" id="modal-images" accept="image/*" multiple style="width: 100%; font-size: 12px;">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category <span class="req">*</span></label>
+              <select id="modal-category" class="form-input" required>
+                <option value="clothing">Clothing</option>
+                <option value="toys">Toys</option>
+                <option value="feeding">Feeding</option>
+                <option value="diapers">Diapers &amp; Care</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Brand</label>
+              <input type="text" id="modal-brand" class="form-input" placeholder="e.g. BabyJoy">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Description <span class="req">*</span></label>
+            <textarea id="modal-description" class="form-input" rows="3" placeholder="Detailed product specifications, fabric, features..." required></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Original Price (₹) <span style="font-weight: 400; color: var(--text-muted);">(MRP)</span></label>
+              <input type="number" id="modal-original-price" class="form-input" placeholder="e.g. 799" min="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Discounted Selling Price (₹) <span class="req">*</span></label>
+              <input type="number" id="modal-price" class="form-input" placeholder="e.g. 599" min="0" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Inventory Stock Units <span class="req">*</span></label>
+              <input type="number" id="modal-stock" class="form-input" placeholder="e.g. 25" min="0" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Product Images</label>
+              <input type="file" id="modal-images" accept="image/*" multiple class="form-input" style="padding: 5px;">
+              <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 3px;">Select multiple files to upload to cloud storage</small>
+            </div>
           </div>
         </div>
-        <div style="margin-top: 20px;"><button type="submit" class="btn btn-primary" style="width: 100%;"><i class="fas fa-save"></i> Save Product</button></div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-product">
+            <i class="fas fa-check"></i> Save Product
+          </button>
+        </div>
       </form>
     </div>
   </div>
 
+  <!-- ========================================================== -->
+  <!-- MODAL: ORDER DETAILS & FULFILLMENT DRAWER -->
+  <!-- ========================================================== -->
+  <div class="modal-overlay" id="order-details-modal">
+    <div class="modal" style="max-width: 680px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h2 id="od-title">Order Details</h2>
+          <span id="od-status-pill" class="badge-pill"></span>
+        </div>
+        <button class="icon-btn" onclick="closeOrderDetailsModal()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="modal-body" id="order-details-body">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeOrderDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- MODAL: CUSTOM CONFIRMATION DIALOG (No raw alert/confirm) -->
+  <!-- ========================================================== -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2 id="confirm-title" style="color: var(--danger);">Confirm Action</h2>
+        <button class="icon-btn" onclick="closeConfirmModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" style="font-size: 13.5px; color: var(--text-body); line-height: 1.6;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-action-btn">
+          <i class="fas fa-trash"></i> Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core App Logic -->
   <script src="js/app.js"></script>
-  
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- PROMO CODE JAVASCRIPT LOGIC -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <script>
-    const API_PROMO_URL = 'https://www.kidocart.shop/api/promo'; // Hits your main website backend
-
-    // 1. Fetch and Display Active Promos
-    async function fetchPromoCodes() {
-      const container = document.getElementById('promo-list-container');
-      try {
-        const res = await fetch(API_PROMO_URL);
-        const promos = await res.json();
-
-        if (!promos || promos.length === 0) {
-          container.innerHTML = '<p style="color: var(--text-muted);">No active promo codes found. Generate one above!</p>';
-          return;
-        }
-
-        let html = '<table class="promo-table"><thead><tr><th>Code</th><th>Discount Type</th><th>Value</th><th>Action</th></tr></thead><tbody>';
-        
-        promos.forEach(p => {
-          let val = p.discountType === 'percentage' ? p.discountValue + '%' : (p.discountType === 'flat' ? '₹' + p.discountValue : 'FREE');
-          let typeStr = p.discountType.replace('_', ' ').toUpperCase();
-          html += `
-            <tr>
-              <td><span class="promo-badge">${p.code}</span></td>
-              <td style="font-size: 14px;">${typeStr}</td>
-              <td style="font-weight: bold;">${val}</td>
-              <td><button class="icon-btn" onclick="deletePromoCode('${p._id}')" style="color: var(--danger, #EF4444);" title="Delete"><i class="fas fa-trash"></i></button></td>
-            </tr>
-          `;
-        });
-        
-        html += '</tbody></table>';
-        container.innerHTML = html;
-      } catch (err) {
-        container.innerHTML = '<p style="color: red;">Failed to load promo codes.</p>';
-      }
-    }
-
-    // 2. Generate a new Random Promo Code
-    async function generatePromoCode() {
-      const type = document.getElementById('promo-type').value;
-      const value = document.getElementById('promo-value').value || 0;
-
-      try {
-        const res = await fetch(API_PROMO_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ discountType: type, discountValue: Number(value) })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          alert('Success! Generated Code: ' + data.code);
-          document.getElementById('promo-value').value = ''; // Clear input
-          fetchPromoCodes(); // Refresh list
-        } else {
-          alert('Failed to generate promo code.');
-        }
-      } catch (e) {
-        alert('Server connection error.');
-      }
-    }
-
-    // 3. Delete a Promo Code
-    async function deletePromoCode(id) {
-      if (!confirm('Are you sure you want to delete this promo code? It will stop working for customers instantly.')) return;
-      
-      try {
-        const res = await fetch(`${API_PROMO_URL}?id=${id}`, { method: 'DELETE' });
-        if (res.ok) {
-          fetchPromoCodes(); // Refresh list
-        } else {
-          alert('Failed to delete.');
-        }
-      } catch (e) {
-        alert('Server connection error.');
-      }
-    }
-
-    // 4. Hook into your existing tab clicks to load the data when the tab opens
-    document.addEventListener('DOMContentLoaded', () => {
-      const navItems = document.querySelectorAll('.nav-item');
-      navItems.forEach(item => {
-        item.addEventListener('click', () => {
-          if (item.getAttribute('data-target') === 'promo-view') {
-            fetchPromoCodes();
-          }
-        });
-      });
-    });
-  </script>
-
 </body>
 </html>

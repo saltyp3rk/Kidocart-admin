@@ -291,12 +291,42 @@ async function sendFcmOrderNotification(order, status) {
     return;
   }
 
-  // 3. Dispatch multicast via Firebase Admin
+  // 3. Dispatch multicast via Firebase Admin with rich Android notification styling
   if (admin.apps.length > 0 && admin.messaging) {
     try {
+      const firstItemImage = order.items?.[0]?.image || order.items?.[0]?.images?.[0] || null;
+      const imageUrl = (firstItemImage && typeof firstItemImage === 'string' && firstItemImage.startsWith('http')) ? firstItemImage : undefined;
+
       const resp = await admin.messaging().sendEachForMulticast({
         tokens,
-        notification: { title, body },
+        notification: {
+          title,
+          body,
+          ...(imageUrl ? { imageUrl } : {}),
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            title,
+            body,
+            icon: 'ic_notification',
+            color: '#FF6B35',
+            channelId: 'kidocart_orders',
+            sound: 'default',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+            tag: `order_${shortId}`,
+            ...(imageUrl ? { imageUrl } : {}),
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
+          },
+        },
         data: {
           orderId: String(order._id),
           type: 'order',
@@ -337,10 +367,10 @@ module.exports = async (req, res) => {
       const decoded = await verifyToken(req.headers.authorization);
       if (!decoded) return res.status(401).json({ error: 'Unauthorized: Invalid token' });
 
-      if (isAdmin === 'true') {
+      if (isAdmin === 'true' || decoded.role === 'admin' || decoded.isAdmin) {
         const orders = await Order.find()
-          .populate('userId', 'name email')
-          .sort({ createdAt: -1 });
+          .sort({ createdAt: -1 })
+          .lean();
         return res.status(200).json(orders);
       }
 

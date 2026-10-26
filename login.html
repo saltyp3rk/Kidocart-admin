@@ -3,57 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login</title>
+  <title>KidoCart Admin — Sign In</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .login-container {
-      display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px;
-      background:
-        radial-gradient(900px 500px at 15% 0%, rgba(255,138,91,0.35), transparent 55%),
-        radial-gradient(800px 500px at 100% 100%, rgba(20,184,166,0.22), transparent 55%),
-        #eef1f6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+      background: radial-gradient(1200px 600px at 50% 0%, rgba(255, 107, 53, 0.08), transparent 70%), var(--bg-app);
     }
     .login-card {
-      width: 100%; max-width: 400px; padding: 36px 32px; text-align: center;
-      background: rgba(255,255,255,0.72);
-      -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
-      border: 1px solid rgba(255,255,255,0.6); border-radius: 22px;
-      box-shadow: 0 24px 60px rgba(17,24,39,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+      width: 100%;
+      max-width: 380px;
+      padding: 34px 28px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
     }
-    .login-logo {
-      width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px;
-      background: linear-gradient(135deg, #FF8A5B, #FF6B35);
-      display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px;
-      box-shadow: 0 10px 24px rgba(255,107,53,0.35);
+    .login-brand-header {
+      text-align: center;
+      margin-bottom: 24px;
     }
-    .login-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--black); }
-    .login-title span { color: var(--primary); }
-    .login-sub { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; margin-bottom: 26px; }
-    .login-card .form-group { text-align: left; }
-    .login-card .form-label { margin-bottom: 7px; }
-    .error-msg { color: var(--danger); font-size: 13.5px; margin-bottom: 15px; display: none; text-align: center; font-weight: 500; background: rgba(239,68,68,0.08); padding: 10px; border-radius: 10px; }
+    .login-brand-logo {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-lg);
+      margin: 0 auto 12px;
+      background: linear-gradient(135deg, var(--primary), #FF8A5B);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.28);
+    }
+    .login-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+    .login-title span {
+      color: var(--primary);
+    }
+    .login-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .alert-banner {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-banner.error {
+      background: var(--danger-light);
+      color: var(--danger-text);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .alert-banner.info {
+      background: var(--info-light);
+      color: var(--info-text);
+      border: 1px solid rgba(2, 132, 199, 0.25);
+    }
   </style>
 </head>
 <body>
 
   <div class="login-container">
     <div class="login-card">
-      <div class="login-logo"><i class="fas fa-store"></i></div>
-      <div class="login-title">Kido<span>Cart</span> Admin</div>
-      <div class="login-sub">Sign in to manage your store</div>
-      <div class="error-msg" id="error-box">Invalid credentials</div>
+      <div class="login-brand-header">
+        <div class="login-brand-logo">
+          <i class="fas fa-shopping-bag"></i>
+        </div>
+        <div class="login-title">Kido<span>Cart</span> Admin</div>
+        <div class="login-subtitle">Sign in to manage store operations</div>
+      </div>
+
+      <div class="alert-banner error" id="error-box">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span id="error-message-text">Invalid admin credentials</span>
+      </div>
+
+      <div class="alert-banner info" id="info-box">
+        <i class="fas fa-circle-info"></i>
+        <span id="info-message-text">Session expired. Please log in again.</span>
+      </div>
 
       <form id="login-form">
         <div class="form-group">
           <label class="form-label">Username</label>
-          <input type="text" id="username" class="form-input" required autocomplete="username">
+          <input type="text" id="username" class="form-input" placeholder="Admin username" required autocomplete="username">
         </div>
+
         <div class="form-group">
           <label class="form-label">Password</label>
-          <input type="password" id="password" class="form-input" required autocomplete="current-password">
+          <input type="password" id="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 14px; justify-content: center;" id="login-btn">Log In</button>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 10px 16px;" id="login-btn">
+          <i class="fas fa-arrow-right-to-bracket"></i> Sign In
+        </button>
       </form>
     </div>
   </div>
@@ -61,14 +119,25 @@
   <script>
     const API_BASE = 'https://admin.kidocart.shop';
 
+    // Check for session expired query param
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('expired') === 'true') {
+      const infoBox = document.getElementById('info-box');
+      if (infoBox) infoBox.style.display = 'flex';
+    }
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById('error-box');
+      const errorText = document.getElementById('error-message-text');
+      const infoBox = document.getElementById('info-box');
       const loginBtn = document.getElementById('login-btn');
       
       errorBox.style.display = 'none';
+      if (infoBox) infoBox.style.display = 'none';
+      
       loginBtn.disabled = true;
-      loginBtn.textContent = 'Logging in...';
+      loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
 
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
@@ -82,20 +151,20 @@
 
         const data = await res.json();
 
-        if (!res.ok) throw new Error(data.error || 'Login failed');
+        if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
-        // Save the token to local storage securely
+        // Save token securely
         localStorage.setItem('admin_token', data.token);
         
-        // Redirect straight to your dashboard panel
+        // Redirect to dashboard
         window.location.href = 'index.html';
 
       } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
+        errorText.textContent = err.message;
+        errorBox.style.display = 'flex';
       } finally {
         loginBtn.disabled = false;
-        loginBtn.textContent = 'Log In';
+        loginBtn.innerHTML = '<i class="fas fa-arrow-right-to-bracket"></i> Sign In';
       }
     });
   </script>
