@@ -616,6 +616,29 @@
   </div>
 
   <!-- ========================================================== -->
+  <!-- MODAL: CUSTOMER ADDRESSES DRAWER / MODAL -->
+  <!-- ========================================================== -->
+  <div class="modal-overlay" id="customer-modal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h2 id="cust-modal-name">Customer Addresses</h2>
+          <span id="cust-modal-count" class="badge-pill" style="background: var(--primary-light); color: var(--primary);">0 Addresses</span>
+        </div>
+        <button class="icon-btn" onclick="closeCustomerModal()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="modal-body" id="cust-modal-body">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeCustomerModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
   <!-- MODAL: CUSTOM CONFIRMATION DIALOG (No raw alert/confirm) -->
   <!-- ========================================================== -->
   <div class="modal-overlay" id="confirm-modal">

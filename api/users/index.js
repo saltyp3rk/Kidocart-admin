@@ -47,6 +47,29 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
+const addressSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  firstName: String,
+  lastName: String,
+  name: String,
+  phone: String,
+  address: String,
+  street: String,
+  apartment: String,
+  address2: String,
+  city: String,
+  state: String,
+  pincode: String,
+  zip: String,
+  zipcode: String,
+  country: { type: String, default: 'India' },
+  isDefault: Boolean,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { strict: false });
+
+const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
+
 module.exports = async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -61,7 +84,7 @@ module.exports = async (req, res) => {
     await connectToDatabase();
     const { action, admin } = req.query;
 
-    // ─── ADMIN DASHBOARD: GET ALL CUSTOMERS ───
+    // ─── ADMIN DASHBOARD: GET ALL CUSTOMERS (ENRICHED WITH MOBILE & ORDER ADDRESSES) ───
     if (req.method === 'GET' && (!action || admin === 'true')) {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -72,8 +95,128 @@ module.exports = async (req, res) => {
         const token = authHeader.replace('Bearer ', '');
         jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
 
-        const allUsers = await User.find().select('-password').sort({ createdAt: -1 });
-        return res.status(200).json(allUsers);
+        const allUsers = await User.find().select('-password').sort({ createdAt: -1 }).lean();
+
+        // 1. Fetch all addresses from standalone Address collection (used by mobile app)
+        let allStandaloneAddresses = [];
+        try {
+          allStandaloneAddresses = await Address.find({}).sort({ isDefault: -1, createdAt: -1 }).lean();
+        } catch (addrErr) {
+          console.warn('[ADMIN-USERS] Failed to fetch standalone addresses:', addrErr.message);
+        }
+
+        // 2. Fetch shipping addresses from recent orders as fallback
+        let recentOrders = [];
+        try {
+          recentOrders = await mongoose.connection.collection('orders')
+            .find({}, { projection: { userId: 1, shippingAddress: 1, phone: 1, createdAt: 1 } })
+            .sort({ createdAt: -1 })
+            .toArray();
+        } catch (ordErr) {
+          console.warn('[ADMIN-USERS] Failed to fetch order addresses:', ordErr.message);
+        }
+
+        // Group standalone addresses by userId variants
+        const standaloneByUserId = new Map();
+        for (const addr of allStandaloneAddresses) {
+          const uId = String(addr.userId || '').trim();
+          if (uId) {
+            if (!standaloneByUserId.has(uId)) standaloneByUserId.set(uId, []);
+            standaloneByUserId.get(uId).push(addr);
+          }
+        }
+
+        // Group order shipping addresses by userId
+        const orderAddressesByUserId = new Map();
+        for (const ord of recentOrders) {
+          const uId = String(ord.userId || '').trim();
+          if (uId && ord.shippingAddress && !orderAddressesByUserId.has(uId)) {
+            orderAddressesByUserId.set(uId, ord.shippingAddress);
+          }
+        }
+
+        const enrichedUsers = allUsers.map(user => {
+          const idKey1 = String(user._id || '');
+          const idKey2 = String(user.userId || '');
+          const idKey3 = String(user.id || '');
+
+          // Get all matching standalone addresses
+          const standalone = [
+            ...(standaloneByUserId.get(idKey1) || []),
+            ...(idKey2 && idKey2 !== idKey1 ? (standaloneByUserId.get(idKey2) || []) : []),
+            ...(idKey3 && idKey3 !== idKey1 && idKey3 !== idKey2 ? (standaloneByUserId.get(idKey3) || []) : [])
+          ];
+
+          // Get embedded addresses
+          const embedded = Array.isArray(user.addresses) ? user.addresses : [];
+
+          // Merge addresses avoiding duplicate entries
+          const mergedAddresses = [...embedded];
+          for (const s of standalone) {
+            const sIdStr = s._id ? s._id.toString() : '';
+            const isDuplicate = mergedAddresses.some(m => {
+              const mIdStr = m._id ? m._id.toString() : (m.id ? String(m.id) : '');
+              if (sIdStr && mIdStr && sIdStr === mIdStr) return true;
+              return m.address && s.address && m.address.trim().toLowerCase() === s.address.trim().toLowerCase() && (m.pincode === s.pincode || m.zipcode === s.pincode);
+            });
+
+            if (!isDuplicate) {
+              const cleanFullName = `${s.firstName || ''} ${s.lastName || ''}`.trim();
+              mergedAddresses.push({
+                _id: s._id,
+                id: sIdStr || s.id,
+                name: s.name || cleanFullName || user.name,
+                firstName: s.firstName,
+                lastName: s.lastName,
+                phone: s.phone || user.phone,
+                address: s.address || s.street,
+                street: s.address || s.street,
+                apartment: s.apartment || s.address2,
+                city: s.city,
+                state: s.state,
+                pincode: s.pincode || s.zip || s.zipcode,
+                zip: s.pincode || s.zip || s.zipcode,
+                zipcode: s.pincode || s.zip || s.zipcode,
+                country: s.country || 'India',
+                isDefault: !!s.isDefault,
+                createdAt: s.createdAt || new Date()
+              });
+            }
+          }
+
+          // If still no addresses, fallback to the address used on their most recent order
+          if (mergedAddresses.length === 0) {
+            const orderAddr = orderAddressesByUserId.get(idKey1) || 
+                              (idKey2 ? orderAddressesByUserId.get(idKey2) : null) || 
+                              (idKey3 ? orderAddressesByUserId.get(idKey3) : null);
+            if (orderAddr) {
+              mergedAddresses.push({
+                name: orderAddr.name || `${orderAddr.firstName || ''} ${orderAddr.lastName || ''}`.trim() || user.name,
+                firstName: orderAddr.firstName,
+                lastName: orderAddr.lastName,
+                phone: orderAddr.phone || user.phone,
+                address: orderAddr.address || orderAddr.street,
+                street: orderAddr.address || orderAddr.street,
+                apartment: orderAddr.apartment || orderAddr.address2,
+                city: orderAddr.city,
+                state: orderAddr.state,
+                pincode: orderAddr.pincode || orderAddr.zip || orderAddr.zipcode,
+                zip: orderAddr.pincode || orderAddr.zip || orderAddr.zipcode,
+                zipcode: orderAddr.pincode || orderAddr.zip || orderAddr.zipcode,
+                country: orderAddr.country || 'India',
+                isDefault: true,
+                fromOrderHistory: true
+              });
+            }
+          }
+
+          return {
+            ...user,
+            addresses: mergedAddresses
+          };
+        });
+
+        return res.status(200).json(enrichedUsers);
       } catch (error) {
         console.error('Token Verification Error:', error);
         return res.status(401).json({ error: 'Unauthorized: Invalid token' });

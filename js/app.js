@@ -1115,13 +1115,28 @@ function renderCustomers(users) {
   }
 
   const rows = users.map(u => {
+    const uId = u._id || u.userId || u.id;
     const initial = (u.name || u.email || 'K').trim().charAt(0).toUpperCase();
     const d = new Date(u.createdAt);
     const joined = isNaN(d) ? '—' : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
-    const addr = (Array.isArray(u.addresses) && u.addresses.length) ? u.addresses[u.addresses.length - 1] : null;
-    const city = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '—';
+    const addrs = Array.isArray(u.addresses) ? u.addresses : [];
+    const addr = addrs.find(a => a.isDefault) || (addrs.length ? addrs[addrs.length - 1] : null);
+    
+    let locationText = '—';
+    if (addr) {
+      const parts = [addr.city, addr.state].filter(Boolean);
+      if (parts.length) locationText = parts.join(', ');
+      else if (addr.pincode || addr.zipcode || addr.zip) locationText = `PIN: ${addr.pincode || addr.zipcode || addr.zip}`;
+      else if (addr.address || addr.street) locationText = (addr.address || addr.street).slice(0, 30);
+    }
+
     const provider = u.authProvider || u.provider || (u.phone && !u.email ? 'phone' : 'email');
+    const addrCount = addrs.length;
+
+    const addressSubtitle = addrCount > 0
+      ? `<span class="cell-sub" style="cursor: pointer; color: var(--primary); font-weight: 600;" onclick="viewCustomerAddresses('${uId}')" title="Click to view addresses"><i class="fas fa-location-dot"></i> ${addrCount} saved address(es)</span>`
+      : `<div class="cell-sub">0 saved address(es)</div>`;
 
     return `
       <tr>
@@ -1129,8 +1144,8 @@ function renderCustomers(users) {
           <div style="display: flex; align-items: center; gap: 12px;">
             <span class="cell-avatar">${escapeHtml(initial)}</span>
             <div>
-              <div class="cell-strong">${escapeHtml(u.name || 'Unnamed Customer')}</div>
-              <div class="cell-sub">${(u.addresses || []).length} saved address(es)</div>
+              <div class="cell-strong" style="cursor: pointer;" onclick="viewCustomerAddresses('${uId}')">${escapeHtml(u.name || 'Unnamed Customer')}</div>
+              ${addressSubtitle}
             </div>
           </div>
         </td>
@@ -1138,9 +1153,14 @@ function renderCustomers(users) {
           <div>${escapeHtml(u.email || '—')}</div>
           <div class="cell-sub">${escapeHtml(u.phone || '—')}</div>
         </td>
-        <td>${escapeHtml(city)}</td>
+        <td>${escapeHtml(locationText)}</td>
         <td><span class="badge-pill pv-${escapeHtml(provider)}">${escapeHtml(provider)}</span></td>
         <td>${escapeHtml(joined)}</td>
+        <td>
+          <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="viewCustomerAddresses('${uId}')">
+            <i class="fas fa-address-book"></i> Addresses
+          </button>
+        </td>
       </tr>`;
   }).join('');
 
@@ -1155,12 +1175,80 @@ function renderCustomers(users) {
               <th>Location</th>
               <th>Channel</th>
               <th>Joined Date</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
     </div>`;
+}
+
+function viewCustomerAddresses(customerId) {
+  const user = allCustomers.find(u => String(u._id || u.userId || u.id) === String(customerId));
+  if (!user) {
+    showToast('Customer record not found', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('customer-modal');
+  const nameEl = document.getElementById('cust-modal-name');
+  const countEl = document.getElementById('cust-modal-count');
+  const bodyEl = document.getElementById('cust-modal-body');
+
+  const addrs = Array.isArray(user.addresses) ? user.addresses : [];
+
+  if (nameEl) nameEl.textContent = `${user.name || 'Customer'}'s Addresses`;
+  if (countEl) countEl.textContent = `${addrs.length} Saved Address${addrs.length === 1 ? '' : 'es'}`;
+
+  if (!addrs.length) {
+    bodyEl.innerHTML = `
+      <div class="empty-state" style="padding: 30px 20px;">
+        <i class="fas fa-map-location-dot empty-icon"></i>
+        <h3>No addresses on file</h3>
+        <p>This customer has not saved any shipping addresses in their mobile app or web profile yet.</p>
+      </div>`;
+  } else {
+    bodyEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        ${addrs.map((a, idx) => {
+          const isDef = !!a.isDefault;
+          const fullName = a.name || `${a.firstName || ''} ${a.lastName || ''}`.trim() || user.name || 'Recipient';
+          const fullAddress = [
+            a.address || a.street,
+            a.apartment || a.address2,
+            a.city,
+            a.state,
+            a.pincode || a.zipcode || a.zip,
+            a.country || 'India'
+          ].filter(Boolean).join(', ');
+
+          const phone = a.phone || user.phone || '—';
+
+          return `
+            <div class="order-info-card" style="border: 1px solid var(--border); background: var(--surface-card);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div class="cell-strong" style="font-size: 14px;">${escapeHtml(fullName)}</div>
+                ${isDef ? `<span class="badge-pill st-delivered"><i class="fas fa-star" style="font-size: 9px;"></i> Default Address</span>` : `<span class="cell-sub">Address #${idx + 1}</span>`}
+              </div>
+              <div style="font-size: 13px; color: var(--text-body); line-height: 1.5; margin-bottom: 6px;">
+                ${escapeHtml(fullAddress)}
+              </div>
+              <div class="cell-sub" style="display: flex; gap: 16px; align-items: center;">
+                <span><i class="fas fa-phone" style="font-size: 10px;"></i> ${escapeHtml(phone)}</span>
+                ${a.fromOrderHistory ? `<span class="badge-pill" style="background:#F1F5F9; color:#64748B; font-size:10.5px;">From Recent Order</span>` : ''}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  if (modal) modal.classList.add('active');
+}
+
+function closeCustomerModal() {
+  const modal = document.getElementById('customer-modal');
+  if (modal) modal.classList.remove('active');
 }
 
 function filterCustomers(query) {
