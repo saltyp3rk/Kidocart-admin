@@ -553,31 +553,152 @@
             </div>
           </div>
 
+          <!-- Rich Text Description -->
           <div class="form-group">
-            <label class="form-label">Description <span class="req">*</span></label>
-            <textarea id="modal-description" class="form-input" rows="3" placeholder="Detailed product specifications, fabric, features..." required></textarea>
+            <div class="rich-editor-label-row">
+              <label class="form-label" style="margin-bottom: 0;">Description <span class="req">*</span></label>
+              <span class="rich-editor-tag"><i class="fas fa-feather"></i> Rich Editor</span>
+            </div>
+            <div class="rich-editor-wrapper" id="rich-editor-wrapper">
+              <div class="rich-editor-toolbar" role="toolbar" aria-label="Description formatting options">
+                <div class="toolbar-group">
+                  <button type="button" class="editor-btn" data-cmd="bold" title="Bold (Ctrl+B)" aria-label="Bold">
+                    <i class="fas fa-bold"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="italic" title="Italic (Ctrl+I)" aria-label="Italic">
+                    <i class="fas fa-italic"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="underline" title="Underline (Ctrl+U)" aria-label="Underline">
+                    <i class="fas fa-underline"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough">
+                    <i class="fas fa-strikethrough"></i>
+                  </button>
+                </div>
+                <div class="toolbar-sep"></div>
+                <div class="toolbar-group">
+                  <button type="button" class="editor-btn editor-btn-text" data-cmd="formatBlock" data-val="h2" title="Heading 2" aria-label="Heading 2">H2</button>
+                  <button type="button" class="editor-btn editor-btn-text" data-cmd="formatBlock" data-val="h3" title="Heading 3" aria-label="Heading 3">H3</button>
+                  <button type="button" class="editor-btn editor-btn-text" data-cmd="formatBlock" data-val="p" title="Paragraph" aria-label="Paragraph">¶</button>
+                </div>
+                <div class="toolbar-sep"></div>
+                <div class="toolbar-group">
+                  <button type="button" class="editor-btn" data-cmd="insertUnorderedList" title="Bulleted List" aria-label="Bulleted List">
+                    <i class="fas fa-list-ul"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="insertOrderedList" title="Numbered List" aria-label="Numbered List">
+                    <i class="fas fa-list-ol"></i>
+                  </button>
+                </div>
+                <div class="toolbar-sep"></div>
+                <div class="toolbar-group">
+                  <button type="button" class="editor-btn" data-cmd="createLink" title="Insert Link" aria-label="Insert Link">
+                    <i class="fas fa-link"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="unlink" title="Remove Link" aria-label="Remove Link">
+                    <i class="fas fa-link-slash"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="removeFormat" title="Clear Formatting" aria-label="Clear Formatting">
+                    <i class="fas fa-eraser"></i>
+                  </button>
+                </div>
+                <div class="toolbar-sep"></div>
+                <div class="toolbar-group">
+                  <button type="button" class="editor-btn" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+                    <i class="fas fa-rotate-left"></i>
+                  </button>
+                  <button type="button" class="editor-btn" data-cmd="redo" title="Redo (Ctrl+Y)" aria-label="Redo">
+                    <i class="fas fa-rotate-right"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="modal-description-editor" class="rich-editor-content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Detailed product specifications, fabric, features, care instructions..."></div>
+            </div>
+            <input type="hidden" id="modal-description" required>
+            <small class="form-hint">Supports headings, bullet lists, formatting and links</small>
           </div>
 
-          <div class="form-row">
+          <div class="form-row-3">
             <div class="form-group">
               <label class="form-label">Original Price (₹) <span style="font-weight: 400; color: var(--text-muted);">(MRP)</span></label>
               <input type="number" id="modal-original-price" class="form-input" placeholder="e.g. 799" min="0">
             </div>
             <div class="form-group">
-              <label class="form-label">Discounted Selling Price (₹) <span class="req">*</span></label>
+              <label class="form-label">Selling Price (₹) <span class="req">*</span></label>
               <input type="number" id="modal-price" class="form-input" placeholder="e.g. 599" min="0" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Stock Units <span class="req">*</span></label>
+              <input type="number" id="modal-stock" class="form-input" placeholder="e.g. 25" min="0" required>
             </div>
           </div>
 
-          <div class="form-row">
+          <!-- Product Images & Gallery Section -->
+          <div class="form-group">
+            <div class="images-section-label-row">
+              <label class="form-label" style="margin-bottom: 0;">Product Images</label>
+              <span class="images-count-badge" id="image-count-badge">0 images</span>
+            </div>
+            
+            <div class="image-uploader-zone" id="image-dropzone" onclick="document.getElementById('modal-images').click()">
+              <input type="file" id="modal-images" accept="image/*" multiple style="display: none;">
+              <div class="uploader-inner">
+                <div class="uploader-icon-circle">
+                  <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+                <div class="uploader-text">
+                  <span class="uploader-action">Click to upload images</span> or select multiple files
+                </div>
+                <span class="uploader-hint">PNG, JPG, WebP supported. First image serves as primary cover.</span>
+              </div>
+            </div>
+
+            <!-- Image Preview Grid -->
+            <div class="image-preview-grid" id="modal-image-previews" style="display: none;"></div>
+          </div>
+
+          <!-- Package & Delivery Details -->
+          <div class="form-section-divider"></div>
+          <div class="form-section-header">
+            <i class="fas fa-truck-ramp-box"></i>
+            <div>
+              <div class="form-section-title">Package &amp; Delivery Details</div>
+              <div class="form-section-subtitle">Parcel weight and dimensions for shipping calculation and courier dispatch</div>
+            </div>
+          </div>
+
+          <div class="form-row-4">
             <div class="form-group">
-              <label class="form-label">Inventory Stock Units <span class="req">*</span></label>
-              <input type="number" id="modal-stock" class="form-input" placeholder="e.g. 25" min="0" required>
+              <label class="form-label form-label-with-unit" for="modal-weight">
+                <span>Package Weight</span>
+                <span class="badge-unit">g</span>
+              </label>
+              <input type="number" id="modal-weight" class="form-input" placeholder="e.g. 350" min="0" step="0.01">
+              <small class="form-hint">Dead weight for courier rate</small>
             </div>
             <div class="form-group">
-              <label class="form-label">Product Images</label>
-              <input type="file" id="modal-images" accept="image/*" multiple class="form-input" style="padding: 5px;">
-              <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 3px;">Select multiple files to upload to cloud storage</small>
+              <label class="form-label form-label-with-unit" for="modal-length">
+                <span>Length</span>
+                <span class="badge-unit">cm</span>
+              </label>
+              <input type="number" id="modal-length" class="form-input" placeholder="e.g. 20" min="0" step="0.1">
+              <small class="form-hint">Parcel length</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label-with-unit" for="modal-width">
+                <span>Width</span>
+                <span class="badge-unit">cm</span>
+              </label>
+              <input type="number" id="modal-width" class="form-input" placeholder="e.g. 15" min="0" step="0.1">
+              <small class="form-hint">Parcel width</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label-with-unit" for="modal-height">
+                <span>Height</span>
+                <span class="badge-unit">cm</span>
+              </label>
+              <input type="number" id="modal-height" class="form-input" placeholder="e.g. 8" min="0" step="0.1">
+              <small class="form-hint">Parcel height</small>
             </div>
           </div>
         </div>

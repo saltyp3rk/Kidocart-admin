@@ -31,6 +31,14 @@ const productSchema = new mongoose.Schema({
     comment: String,
     date: { type: Date, default: Date.now }
   }],
+  weight: Number,
+  dimensions: {
+    length: Number,
+    width: Number,
+    height: Number,
+    weight: Number,
+    unit: { type: String, default: 'cm' }
+  },
   dimentions: {
     length: Number,
     width: Number,
@@ -61,13 +69,19 @@ module.exports = async (req, res) => {
   try {
     await connectDB(); // Safely connect using the new logic
 
-    const { id } = req.query;
+    const targetId = req.query.id || req.query.productId || (req.body && (req.body.id || req.body.productId));
 
     // GET - Fetch products
     if (req.method === 'GET') {
-      if (id) {
+      if (targetId) {
         // Get single product
-        const product = await Product.findById(id);
+        let product = null;
+        if (mongoose.Types.ObjectId.isValid(targetId)) {
+          product = await Product.findById(targetId);
+        }
+        if (!product) {
+          product = await Product.findOne({ $or: [{ id: targetId }, { _id: targetId }] });
+        }
         if (!product) {
           return res.status(404).json({ error: 'Product not found' });
         }
@@ -113,7 +127,7 @@ module.exports = async (req, res) => {
 
     // PUT - Update product
     if (req.method === 'PUT') {
-      if (!id) {
+      if (!targetId) {
         return res.status(400).json({ error: 'Product ID required' });
       }
       
@@ -126,7 +140,14 @@ module.exports = async (req, res) => {
       
       updates.updatedAt = new Date();
       
-      const product = await Product.findByIdAndUpdate(id, updates, { new: true });
+      let product = null;
+      if (mongoose.Types.ObjectId.isValid(targetId)) {
+        product = await Product.findByIdAndUpdate(targetId, updates, { new: true });
+      }
+      if (!product) {
+        product = await Product.findOneAndUpdate({ $or: [{ id: targetId }, { _id: targetId }] }, updates, { new: true });
+      }
+
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
@@ -137,17 +158,24 @@ module.exports = async (req, res) => {
 
     // DELETE - Remove product
     if (req.method === 'DELETE') {
-      if (!id) {
+      if (!targetId) {
         return res.status(400).json({ error: 'Product ID required' });
       }
       
-      const product = await Product.findByIdAndDelete(id);
+      let product = null;
+      if (mongoose.Types.ObjectId.isValid(targetId)) {
+        product = await Product.findByIdAndDelete(targetId);
+      }
+      if (!product) {
+        product = await Product.findOneAndDelete({ $or: [{ id: targetId }, { _id: targetId }] });
+      }
+
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
       
-      console.log('Product deleted:', id);
-      return res.status(200).json({ message: 'Product deleted successfully' });
+      console.log('Product deleted:', targetId);
+      return res.status(200).json({ message: 'Product deleted successfully', id: targetId });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
