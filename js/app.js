@@ -858,6 +858,10 @@ async function viewOrderDetails(orderId) {
           <i class="fas fa-save"></i> Save Tracking
         </button>
       </div>
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border-color); display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
+        <div><i class="fas fa-box" style="color: #FF6B35; margin-right: 4px;"></i> Box Dimensions: <strong style="color: var(--text-main);">${escapeHtml((order.shipmentDimensions && order.shipmentDimensions.length) ? `${order.shipmentDimensions.length} × ${order.shipmentDimensions.width} × ${order.shipmentDimensions.height} cm` : '20 × 15 × 10 cm (Standard)')}</strong></div>
+        <div><i class="fas fa-weight-hanging" style="color: #FF6B35; margin-right: 4px;"></i> Chargeable / Dead Weight: <strong style="color: var(--text-main);">${escapeHtml(order.packageWeight ? `${order.packageWeight} g` : `${items.reduce((s, it) => s + (Number(it.weight) || 500) * (Number(it.quantity) || 1), 0)} g`)}</strong></div>
+      </div>
     </div>
 
     <!-- Items List -->
