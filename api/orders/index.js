@@ -43,12 +43,13 @@ async function connectToDatabase() {
 
 // ─── DELHIVERY B2C SHIPMENT CREATION ───
 async function createDelhiveryShipment(order) {
-  const DELHIVERY_TOKEN = process.env.DELHIVERY_TOKEN; 
+  const DELHIVERY_TOKEN = process.env.DELHIVERY_TOKEN || 'bab3ac4ad2d47c981a6061eadc0512841af12c57'; 
+  const WAREHOUSE_NAME = process.env.DELHIVERY_WAREHOUSE_NAME || 'Farzan Online Services';
   const DELHIVERY_URL = 'https://track.delhivery.com/api/cmu/create.json';
 
   if (!DELHIVERY_TOKEN) {
-    console.log('Skipping Delhivery: No token found in Vercel env');
-    return null;
+    console.error('Skipping Delhivery: No token found in environment');
+    return { success: false, error: 'DELHIVERY_TOKEN missing in server environment' };
   }
 
   const addr = order.shippingAddress || {};
@@ -56,38 +57,54 @@ async function createDelhiveryShipment(order) {
   const lName = addr.lastName || '';
   const fullName = `${fName} ${lName}`.trim() || 'Customer';
   const fullAddress = `${addr.address || ''} ${addr.apartment || addr.address2 || ''}`.trim();
+  const phone = String(order.phone || addr.phone || '').replace(/[^0-9]/g, '').slice(-10);
+  const pin = String(addr.pincode || addr.zip || addr.zipcode || '').replace(/[^0-9]/g, '');
+
+  if (!pin || pin.length !== 6) {
+    return { success: false, error: `Invalid destination PIN code: "${pin}"` };
+  }
+  if (!phone || phone.length !== 10) {
+    return { success: false, error: `Invalid customer phone number: "${phone}"` };
+  }
+
+  const itemCount = Array.isArray(order.items) 
+    ? order.items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+    : 1;
+
+  // Weight in grams: approximate 500g per item if not specified
+  const totalWeight = Array.isArray(order.items)
+    ? order.items.reduce((sum, item) => sum + ((Number(item.weight) || 500) * (Number(item.quantity) || 1)), 0)
+    : 500;
 
   const payload = {
     pickup_location: {
-      name: "Domestic Pickup Location" // This now matches your Delhivery Dashboard exactly!
+      name: WAREHOUSE_NAME
     },
     shipments: [
       {
         name: fullName,
         add: fullAddress,
-        pin: addr.pincode || addr.zip || addr.zipcode,
-        city: addr.city,
-        state: addr.state,
+        pin: pin,
+        city: addr.city || 'Pune',
+        state: addr.state || 'Maharashtra',
         country: "India",
-        phone: order.phone || addr.phone,
-        order: order.orderId || order._id.toString(),
+        phone: phone,
+        order: order.orderId || (order._id ? order._id.toString() : ''),
         payment_mode: order.paymentMethod === 'cod' ? 'COD' : 'Pre-paid',
-        
-        // We removed the return_ address block because your dashboard 
-        // handles returns to the same origin automatically.
-        
         products_desc: "KidoCart Products",
         hsn_code: "4820", 
-        cod_amount: order.paymentMethod === 'cod' ? order.total : 0,
-        order_date: new Date(order.createdAt).toISOString().split('T')[0],
-        total_amount: order.total,
+        cod_amount: order.paymentMethod === 'cod' ? Number(order.total) || 0 : 0,
+        order_date: new Date(order.createdAt || Date.now()).toISOString().split('T')[0],
+        total_amount: Number(order.total) || 0,
+        weight: totalWeight,
         seller_add: "KidoCart, Malegaon",
         seller_name: "KidoCart",
         seller_inv: "INV-" + (order.orderId || '').slice(-6),
-        quantity: order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+        quantity: itemCount
       }
     ]
   };
+
   try {
     const bodyString = `format=json&data=${JSON.stringify(payload)}`;
 
@@ -104,15 +121,65 @@ async function createDelhiveryShipment(order) {
     const data = await response.json();
     
     if (data.success === true && data.packages && data.packages.length > 0) {
-       console.log('Delhivery Success! AWB:', data.packages[0].waybill);
-       return data.packages[0].waybill; 
+       const pkg = data.packages[0];
+       console.log('Delhivery Success! AWB:', pkg.waybill);
+       return {
+         success: true,
+         waybill: pkg.waybill,
+         refnum: pkg.refnum,
+         status: pkg.status,
+         sortCode: pkg.sort_code,
+         raw: data
+       };
     } else {
        console.error('Delhivery Rejected Order:', JSON.stringify(data, null, 2));
-       return null;
+       const errorRemark = (data.packages && data.packages[0] && data.packages[0].remarks && data.packages[0].remarks[0])
+         || data.rmk
+         || 'Delhivery shipment booking was rejected';
+       return {
+         success: false,
+         error: errorRemark,
+         raw: data
+       };
     }
   } catch (error) {
     console.error('Delhivery API Crash:', error);
-    return null;
+    return {
+      success: false,
+      error: error.message || 'Network exception while connecting to Delhivery API'
+    };
+  }
+}
+
+// ─── DELHIVERY SHIPMENT CANCELLATION ───
+async function cancelDelhiveryShipment(waybill) {
+  const DELHIVERY_TOKEN = process.env.DELHIVERY_TOKEN || 'bab3ac4ad2d47c981a6061eadc0512841af12c57';
+  if (!DELHIVERY_TOKEN || !waybill) {
+    return { success: false, error: 'Missing token or waybill' };
+  }
+
+  try {
+    const response = await fetch('https://track.delhivery.com/api/p/edit', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${DELHIVERY_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        waybill: String(waybill).trim(),
+        cancellation: 'true'
+      })
+    });
+
+    const data = await response.json();
+    return {
+      success: data.status === true,
+      data
+    };
+  } catch (error) {
+    console.error('Delhivery cancellation error:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -165,8 +232,12 @@ const orderSchema = new mongoose.Schema({
   paymentStatus: { type: String, default: 'pending' },
   status: { type: String, default: 'confirmed' },
   
-  // FIXED: Explicitly added so Mongoose saves them to MongoDB
+  // Logistics & Delivery Integration (Delhivery)
+  courier: { type: String, default: 'Delhivery' },
   trackingNumber: String, 
+  shipmentId: String,
+  deliveryStatus: { type: String, default: 'unbooked' },
+  shipmentBookingError: String,
   cancelReason: String,   
 
   createdAt: { type: Date, default: Date.now },
@@ -509,22 +580,54 @@ module.exports = async (req, res) => {
       const order = await Order.findOne(getSearchQuery(targetId));
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      // Trigger Delhivery shipping if status switches to processing
-      if (updates.status === 'processing' && !order.trackingNumber) {
-         const awbNumber = await createDelhiveryShipment(order);
-         if (awbNumber) {
-            order.trackingNumber = awbNumber; 
-         }
+      let shipmentResult = null;
+
+      // Trigger Delhivery shipment creation if status switches to processing OR if explicit booking requested
+      const wantsBooking = (updates.status === 'processing' || updates.bookShipment === true || updates.action === 'book_delhivery');
+      const isPlaceholderAwb = order.trackingNumber === '1123213123123';
+      const hasConfirmedBooking = order.trackingNumber && !isPlaceholderAwb && order.deliveryStatus === 'booked';
+
+      if (wantsBooking && !hasConfirmedBooking && updates.status !== 'cancelled') {
+        console.log(`[DELHIVERY] Initiating shipment creation for order ${order.orderId}...`);
+        shipmentResult = await createDelhiveryShipment(order);
+        
+        if (shipmentResult.success && shipmentResult.waybill) {
+          order.trackingNumber = shipmentResult.waybill;
+          order.shipmentId = shipmentResult.waybill;
+          order.courier = 'Delhivery';
+          order.deliveryStatus = 'booked';
+          order.shipmentBookingError = null;
+          console.log(`[DELHIVERY] Order ${order.orderId} booked successfully! AWB: ${shipmentResult.waybill}`);
+        } else {
+          order.deliveryStatus = 'booking_failed';
+          order.shipmentBookingError = shipmentResult.error || 'Failed to create Delhivery shipment';
+          console.error(`[DELHIVERY] Booking failed for order ${order.orderId}:`, shipmentResult.error);
+        }
       }
 
-      // Handle storefront cancellations securely vs standard admin updates
-      if (req.url.includes('/cancel')) {
-        if (['delivered', 'cancelled', 'shipped'].includes(order.status)) {
+      // Handle cancellations securely vs standard admin updates
+      if (req.url.includes('/cancel') || updates.status === 'cancelled') {
+        if (['delivered'].includes(order.status)) {
           return res.status(400).json({ error: 'Order cannot be cancelled at this stage' });
         }
         order.status = 'cancelled';
         if (updates.cancelReason) order.cancelReason = updates.cancelReason;
+
+        // If order had an active Delhivery shipment, cancel it with Delhivery
+        if (order.trackingNumber && !isPlaceholderAwb && order.courier === 'Delhivery') {
+          console.log(`[DELHIVERY] Cancelling shipment ${order.trackingNumber} with Delhivery...`);
+          cancelDelhiveryShipment(order.trackingNumber).then(cancelRes => {
+            console.log(`[DELHIVERY] Shipment cancellation response:`, cancelRes);
+          }).catch(err => {
+            console.error(`[DELHIVERY] Cancellation error:`, err);
+          });
+          order.deliveryStatus = 'cancelled';
+        }
       } else {
+        // If shipment booking succeeded, ensure manual trackingNumber does not overwrite the real AWB
+        if (shipmentResult && shipmentResult.success && shipmentResult.waybill) {
+          delete updates.trackingNumber;
+        }
         Object.assign(order, updates);
       }
       
@@ -543,7 +646,11 @@ module.exports = async (req, res) => {
         console.error('[PUSH-TRIGGER-ERROR]:', err.message);
       });
 
-      return res.status(200).json(order);
+      const responsePayload = order.toObject ? order.toObject() : order;
+      if (shipmentResult) {
+        responsePayload.shipmentResult = shipmentResult;
+      }
+      return res.status(200).json(responsePayload);
     }
 
     // DELETE ORDER

@@ -617,12 +617,24 @@ async function updateOrderStatus(orderId, newStatus) {
     });
 
     if (!res || !res.ok) throw new Error('Status update failed');
+    const updated = await res.json();
 
-    // Update local state optimistically
+    // Update local state
     const local = allAdminOrders.find(o => (o.orderId || o._id) === orderId);
-    if (local) local.status = newStatus;
+    if (local && updated) {
+      Object.assign(local, updated);
+      local.status = newStatus;
+    }
 
-    showToast(`Order marked as ${newStatus}`);
+    if (updated.shipmentResult) {
+      if (updated.shipmentResult.success && updated.shipmentResult.waybill) {
+        showToast(`Order marked as ${newStatus} & Delhivery AWB ${updated.shipmentResult.waybill} booked!`);
+      } else {
+        showToast(`Order marked as ${newStatus}, but Delhivery booking failed: ${updated.shipmentResult.error}`, 'error');
+      }
+    } else {
+      showToast(`Order marked as ${newStatus}`);
+    }
     applyOrderRows();
   } catch (error) {
     showToast(error.message || 'Failed to update order status', 'error');
@@ -775,6 +787,41 @@ async function viewOrderDetails(orderId) {
   const items = Array.isArray(order.items) ? order.items : [];
   const tracking = order.trackingNumber || '';
 
+  const courier = order.courier || 'Delhivery';
+  const deliveryStatus = order.deliveryStatus || (tracking && tracking !== '1123213123123' ? 'booked' : 'unbooked');
+  const isPlaceholder = tracking === '1123213123123';
+  const hasRealAwb = Boolean(tracking && !isPlaceholder);
+
+  let statusBadgeHtml = '';
+  if (hasRealAwb) {
+    statusBadgeHtml = `
+      <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10B981; font-weight: 700; padding: 4px 8px; border-radius: 6px;">
+        <i class="fas fa-check-circle"></i> Manifested / Booked
+      </span>
+      <a href="https://www.delhivery.com/track/package/${encodeURIComponent(tracking)}" target="_blank" rel="noopener noreferrer" style="color: #FF6B35; font-size: 12px; margin-left: 10px; font-weight: 600; text-decoration: none;">
+        <i class="fas fa-external-link-alt"></i> Track on Delhivery
+      </a>`;
+  } else if (deliveryStatus === 'booking_failed' || order.shipmentBookingError) {
+    statusBadgeHtml = `
+      <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #EF4444; font-weight: 700; padding: 4px 8px; border-radius: 6px;">
+        <i class="fas fa-exclamation-triangle"></i> Booking Failed
+      </span>
+      <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; margin-left: 10px;" onclick="triggerDelhiveryBooking('${oid}')">
+        <i class="fas fa-rotate-right"></i> Retry Booking
+      </button>
+      <div style="font-size: 12px; color: #EF4444; width: 100%; margin-top: 6px;">
+        <strong>Error:</strong> ${escapeHtml(order.shipmentBookingError || 'Booking rejected by Delhivery')}
+      </div>`;
+  } else {
+    statusBadgeHtml = `
+      <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #6366F1; font-weight: 700; padding: 4px 8px; border-radius: 6px;">
+        <i class="fas fa-clock"></i> Not Yet Booked
+      </span>
+      <button class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; margin-left: 10px;" onclick="triggerDelhiveryBooking('${oid}')">
+        <i class="fas fa-truck-fast"></i> Book with Delhivery
+      </button>`;
+  }
+
   bodyEl.innerHTML = `
     <div class="order-detail-grid">
       <div class="order-info-card">
@@ -792,14 +839,22 @@ async function viewOrderDetails(orderId) {
       </div>
     </div>
 
-    <!-- Tracking Number Editor -->
-    <div class="card" style="margin-bottom: 20px; padding: 14px;">
+    <!-- Logistics & Tracking Card -->
+    <div class="card" style="margin-bottom: 20px; padding: 14px; border: 1px solid var(--border-color); border-radius: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-main);"><i class="fas fa-truck" style="color: #FF6B35; margin-right: 6px;"></i> Logistics: <strong>Delhivery B2C</strong></span>
+        </div>
+        <div style="display: flex; align-items: center; flex-wrap: wrap;">
+          ${statusBadgeHtml}
+        </div>
+      </div>
       <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-          <label class="form-label" style="margin-bottom: 4px;">Tracking Number / Delhivery AWB</label>
-          <input type="text" id="od-tracking-input" class="form-input" placeholder="e.g. 12837198273" value="${escapeHtml(tracking)}">
+          <label class="form-label" style="margin-bottom: 4px; font-size: 12px;">Delhivery AWB / Waybill Number</label>
+          <input type="text" id="od-tracking-input" class="form-input" placeholder="e.g. 541068..." value="${escapeHtml(hasRealAwb ? tracking : '')}">
         </div>
-        <button class="btn btn-primary" onclick="saveOrderTracking('${oid}')">
+        <button class="btn btn-secondary" onclick="saveOrderTracking('${oid}')">
           <i class="fas fa-save"></i> Save Tracking
         </button>
       </div>
@@ -851,6 +906,39 @@ async function viewOrderDetails(orderId) {
 function closeOrderDetailsModal() {
   const modal = document.getElementById('order-details-modal');
   if (modal) modal.classList.remove('active');
+}
+
+async function triggerDelhiveryBooking(orderId) {
+  try {
+    showToast('Connecting to Delhivery to book shipment...', 'info');
+    const res = await authFetch(`${API_BASE}/api/orders?orderId=${encodeURIComponent(orderId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookShipment: true, status: 'processing' })
+    });
+
+    if (!res || !res.ok) throw new Error('Shipment booking failed');
+    const updated = await res.json();
+
+    const local = allAdminOrders.find(o => String(o.orderId || o._id) === String(orderId));
+    if (local && updated) {
+      Object.assign(local, updated);
+    }
+
+    if (updated.shipmentResult && updated.shipmentResult.success) {
+      showToast(`Delhivery shipment created successfully! AWB: ${updated.shipmentResult.waybill}`);
+    } else if (updated.trackingNumber && updated.trackingNumber !== '1123213123123') {
+      showToast(`Shipment confirmed! AWB: ${updated.trackingNumber}`);
+    } else {
+      const err = (updated.shipmentResult && updated.shipmentResult.error) || updated.shipmentBookingError || 'Booking failed';
+      showToast(`Delhivery booking failed: ${err}`, 'error');
+    }
+
+    viewOrderDetails(orderId);
+    applyOrderRows();
+  } catch (err) {
+    showToast(err.message || 'Error booking Delhivery shipment', 'error');
+  }
 }
 
 async function saveOrderTracking(orderId) {
